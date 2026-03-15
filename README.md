@@ -82,7 +82,9 @@ builder.build_from_file(File.join(__DIR__, "src", "index.html"))
 Run it:
 
 ```bash
-crystal run application.cr
+# The interactive GTK dashboard will spawn next to your window
+# so that you can inspect the components.
+GTK_DEBUG=interactive crystal run ./application.cr -Dpreview_mt
 ```
 
 ## Architecture
