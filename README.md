@@ -41,6 +41,8 @@ my-application/
 ├── application.cr
 └── src/
     └── index.html
+    └── scripts/
+        └── App.jsx
 ```
 
 **`application.cr`** — your entry point:
@@ -68,7 +70,7 @@ builder.build_from_file(File.join(__DIR__, "src", "index.html"))
 </Application>
 ```
 
-**`src/App.jsx`** - your App:
+**`src/scripts/App.jsx`** - your App:
 ```jsx
 function App() {
   const [count, setCount] = useState(0);
