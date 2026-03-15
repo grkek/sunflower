@@ -38,11 +38,13 @@ Create a project with the following structure:
 
 ```
 my-application/
-├── application.cr
-└── src/
-    └── index.html
-    └── scripts/
+└── dist/
+  └── index.html
+  └── scripts/
         └── App.jsx
+└── src/
+  └── application.cr
+
 ```
 
 **`application.cr`** — your entry point:
@@ -56,7 +58,7 @@ Log.setup do |c|
 end
 
 builder = Sunflower::Builder.new
-builder.build_from_file(File.join(__DIR__, "src", "index.html"))
+builder.build_from_file(File.join(__DIR__, "..", "dist", "index.html"))
 ```
 
 **`src/index.html`** — your UI:
@@ -93,7 +95,7 @@ $.onReady(function() {
 Run it:
 
 ```bash
-GTK_DEBUG=interactive crystal run ./application.cr -Dpreview_mt
+GTK_DEBUG=interactive crystal run ./src/application.cr -Dpreview_mt
 ```
 
 ## Two Modes
