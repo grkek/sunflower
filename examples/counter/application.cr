@@ -1,8 +1,8 @@
-require "../src/sunflower"
+require "../../src/sunflower"
 
 Log.setup do |c|
   backend = Log::IOBackend.new(STDERR, formatter: Log::ShortFormat, dispatcher: :sync)
-  c.bind("*", :debug, backend)
+  c.bind("*", :info, backend)
 end
 
 builder = Sunflower::Builder.new

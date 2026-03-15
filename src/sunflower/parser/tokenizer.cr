@@ -15,7 +15,7 @@ module Sunflower
       def initialize(@source : String)
       end
 
-      # --- Public API ---
+      # Public API
 
       def parse_nodes : Array(Node)
         nodes = [] of Node
@@ -34,7 +34,7 @@ module Sunflower
         nodes
       end
 
-      # --- Node parsing ---
+      # Node parsing
 
       private def parse_node : Node?
         if looking_at?("<!--")
@@ -97,7 +97,7 @@ module Sunflower
         create_element(tag_name, attributes, children)
       end
 
-      # --- Attribute parsing ---
+      # Attribute parsing
 
       private def parse_attributes : Hash(String, JSON::Any)
         attrs = {} of String => JSON::Any
@@ -262,13 +262,13 @@ module Sunflower
         JSON::Any.new(expr.strip)
       end
 
-      # --- Tag name parsing ---
+      # Tag name parsing
 
       private def parse_tag_name : String
         consume_while { |c| c.letter? || c.number? || c == '-' || c == '_' || c == '.' }
       end
 
-      # --- Element creation ---
+      # Element creation
 
       private def create_self_closing(tag_name : String, attributes : Hash(String, JSON::Any)) : Node?
         case tag_name
@@ -279,15 +279,21 @@ module Sunflower
             error("Import element requires an 'as' attribute")
           end
           nil
-        when "Script"             then Script.new(attributes)
+        when "Script"              then Script.new(attributes)
         when "StyleSheet"          then StyleSheet.new(attributes)
-        when "Entry"              then Entry.new(attributes)
-        when "Spinner"            then Spinner.new(attributes)
-        when "ProgressBar"        then ProgressBar.new(attributes)
-        when "Image"              then Image.new(attributes)
-        when "VerticalSeparator"  then VerticalSeparator.new(attributes)
+        when "Box"                 then Box.new(attributes)
+        when "Frame"               then Frame.new(attributes)
+        when "ListBox"             then ListBox.new(attributes)
+        when "ScrolledWindow"      then ScrolledWindow.new(attributes)
+        when "Entry"               then Entry.new(attributes)
+        when "Spinner"             then Spinner.new(attributes)
+        when "ProgressBar"         then ProgressBar.new(attributes)
+        when "Image"               then Image.new(attributes)
+        when "Label"               then Label.new(attributes)
+        when "Button"              then Button.new(attributes)
+        when "VerticalSeparator"   then VerticalSeparator.new(attributes)
         when "HorizontalSeparator" then HorizontalSeparator.new(attributes)
-        when "Switch"             then Switch.new(attributes)
+        when "Switch"              then Switch.new(attributes)
         else
           resolve_custom_or_error(tag_name, attributes, [] of Node)
         end
@@ -295,20 +301,20 @@ module Sunflower
 
       private def create_element(tag_name : String, attributes : Hash(String, JSON::Any), children : Array(Node)) : Node?
         case tag_name
-        when "Script"        then Script.new(attributes, children)
-        when "StyleSheet"    then StyleSheet.new(attributes, children)
-        when "Application"   then Application.new(attributes, children)
-        when "Window"        then Window.new(attributes, children)
-        when "Frame"         then Frame.new(attributes, children)
-        when "Box"           then Box.new(attributes, children)
-        when "ListBox"       then ListBox.new(attributes, children)
+        when "Script"         then Script.new(attributes, children)
+        when "StyleSheet"     then StyleSheet.new(attributes, children)
+        when "Application"    then Application.new(attributes, children)
+        when "Window"         then Window.new(attributes, children)
+        when "Frame"          then Frame.new(attributes, children)
+        when "Box"            then Box.new(attributes, children)
+        when "ListBox"        then ListBox.new(attributes, children)
         when "ScrolledWindow" then ScrolledWindow.new(attributes, children)
-        when "Tab"           then Tab.new(attributes, children)
-        when "EventBox"      then EventBox.new(attributes, children)
-        when "Button"        then Button.new(attributes, children)
-        when "Label"         then Label.new(attributes, children)
-        when "TextView"      then TextView.new(attributes, children)
-        when "Export"        then Export.new(attributes, children)
+        when "Tab"            then Tab.new(attributes, children)
+        when "EventBox"       then EventBox.new(attributes, children)
+        when "Button"         then Button.new(attributes, children)
+        when "Label"          then Label.new(attributes, children)
+        when "TextView"       then TextView.new(attributes, children)
+        when "Export"         then Export.new(attributes, children)
         else
           resolve_custom_or_error(tag_name, attributes, children)
         end
@@ -341,7 +347,7 @@ module Sunflower
         end
       end
 
-      # --- Low-level scanner ---
+      # Low-level scanner
 
       private def peek : Char
         @source[@pos]
@@ -420,7 +426,7 @@ module Sunflower
         end
       end
 
-      # --- Error reporting ---
+      # Error reporting
 
       private def error(message : String) : NoReturn
         context = extract_context

@@ -1,6 +1,6 @@
 # Sunflower
 
-A lightweight desktop application framework that pairs **GTK4** with a **JavaScript** engine. Write your UI in a declarative XML markup, style it with CSS, and bring it to life with JavaScript — all without the overhead of a browser engine.
+A lightweight desktop application framework that pairs **GTK4** with a **JavaScript** engine. Write your UI in declarative XML markup or **JSX components**, style it with CSS, and bring it to life with JavaScript — all without the overhead of a browser engine.
 
 Sunflower is built with [Crystal](https://crystal-lang.org) and uses [QuickJS](https://bellard.org/quickjs/) (via [Medusa](https://github.com/grkek/medusa)) as its embedded JavaScript runtime.
 
@@ -62,34 +62,99 @@ builder.build_from_file(File.join(__DIR__, "src", "index.html"))
 ```xml
 <Application applicationId="com.example.hello">
   <Window title="Hello Sunflower" width="400" height="300">
-    <Box orientation="vertical" spacing="12">
-      <Label id="greeting">Hello, World!</Label>
-      <Button id="clickMe">Click Me</Button>
-    </Box>
+    <Box id="root" orientation="vertical" expand="true" />
   </Window>
-
-  <Script>
-    var count = 0;
-
-    $.getComponentById("clickMe").on.press = function() {
-      count++;
-      $.getComponentById("greeting").setText("Clicked " + count + " times!");
-    };
-  </Script>
+  <Script src="scripts/App.jsx" />
 </Application>
+```
+
+**`src/App.jsx`** - your App:
+```jsx
+function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <Box orientation="vertical" spacing="12">
+      <Label>{"Clicked " + count + " times!"}</Label>
+      <Button onPress={function() { setCount(count + 1); }}>
+        Click Me
+      </Button>
+    </Box>
+  );
+}
+
+$.onReady(function() {
+  $.render("root", App);
+});
 ```
 
 Run it:
 
 ```bash
-# The interactive GTK dashboard will spawn next to your window
-# so that you can inspect the components.
 GTK_DEBUG=interactive crystal run ./application.cr -Dpreview_mt
 ```
 
-## Architecture
+## Two Modes
 
-Sunflower has three layers:
+Sunflower supports two development styles:
+
+### 1. Markup Mode
+
+Define your UI in XML with inline or external scripts. Best for simpler apps or when you want a clear separation between structure and logic.
+
+```xml
+<Application applicationId="com.example.app">
+  <StyleSheet src="styles/index.css" />
+  <Window title="My App" width="800" height="600">
+    <Box orientation="vertical">
+      <Label id="title">Hello!</Label>
+      <Button id="btn">Click</Button>
+    </Box>
+  </Window>
+  <Script src="scripts/index.js" />
+</Application>
+```
+
+### 2. JSX Mode
+
+Define your UI as composable function components with `useState`, `useEffect`, and a virtual DOM reconciler. The markup becomes a minimal shell.
+
+**`src/index.html`**:
+
+```xml
+<Application applicationId="com.example.app">
+  <StyleSheet src="styles/index.css" />
+  <Window title="My App" width="800" height="600">
+    <Box id="root" orientation="vertical" expand="true" />
+  </Window>
+  <Script src="scripts/App.jsx" />
+</Application>
+```
+
+**`scripts/App.jsx`**:
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <Box orientation="vertical" spacing="12">
+      <Label className="title">Count: {count}</Label>
+      <Button onPress={function() { setCount(count + 1); }}>
+        Increment
+      </Button>
+    </Box>
+  );
+}
+
+$.onReady(function() {
+  $.render("root", Counter);
+});
+```
+
+The JSX transpiler runs automatically for `.jsx` files — no build step required.
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────┐
@@ -101,7 +166,7 @@ Sunflower has three layers:
 └─────────────────────────────────────┘
 ```
 
-The Crystal bridge connects GTK4 widgets to JavaScript objects. Every widget you declare in markup gets a corresponding JS object with methods and event handlers. Async operations (HTTP requests, file I/O) use a promise-based bridge — Crystal spawns a fiber, does the work, and resolves the JS promise when done.
+The Crystal bridge connects GTK4 widgets to JavaScript objects. Every widget gets a corresponding JS object with methods and event handlers. Async operations use a promise-based bridge — Crystal spawns a fiber, does the work, and resolves the JS promise when done.
 
 ## Markup
 
@@ -116,7 +181,7 @@ Sunflower uses an XML-based markup language. Every application starts with an `<
 | `Box` | Flex container. Attributes: `orientation` (`vertical`/`horizontal`), `spacing`, `homogeneous`. |
 | `Button` | Clickable button. Events: `press`. |
 | `Label` | Text display. Supports markup. |
-| `Entry` | Text input field. Events: `change`. |
+| `Entry` | Text input field. Events: `change`. Attributes: `inputType="password"`. |
 | `Image` | Displays images from local paths or URLs. |
 | `ListBox` | Scrollable list container. |
 | `ScrolledWindow` | Scrollable container for overflow content. |
@@ -126,6 +191,8 @@ Sunflower uses an XML-based markup language. Every application starts with an `<
 | `HorizontalSeparator` | Horizontal divider line. |
 | `VerticalSeparator` | Vertical divider line. |
 
+All components support self-closing syntax: `<Box />`, `<Entry />`, `<StyleSheet src="..." />`.
+
 ### Attributes
 
 Every component supports:
@@ -133,6 +200,8 @@ Every component supports:
 - `id` — Unique identifier for JS access
 - `className` — CSS class for styling
 - `expand` — Whether the widget expands to fill available space
+- `horizontalAlignment` — `"center"`, `"start"`, `"end"`, `"fill"`
+- `verticalAlignment` — `"center"`, `"start"`, `"end"`, `"fill"`
 
 ### Scripts
 
@@ -144,8 +213,11 @@ Embed JavaScript inline or load from a file:
   console.log("Hello from Sunflower!");
 </Script>
 
-<!-- External -->
+<!-- External JS -->
 <Script src="scripts/index.js" />
+
+<!-- External JSX (auto-transpiled) -->
+<Script src="scripts/App.jsx" />
 ```
 
 ### Stylesheets
@@ -199,8 +271,8 @@ $.getComponentById("myButton").on.press = function() {
   console.log("Button pressed!");
 };
 
-$.getComponentById("myEntry").on.change = function(data) {
-  console.log("Text changed: " + data);
+$.getComponentById("myEntry").on.change = function(text) {
+  console.log("Text changed: " + text);
 };
 ```
 
@@ -219,20 +291,11 @@ btn.setText("New Label");
 var label = $.getComponentById("myLabel");
 label.setText("Plain text");
 label.setLabel("Text with <b>markup</b>");
+label.getText();
 label.setWrap(true);
-label.setWrapMode("word");
 label.setEllipsize("end");
-label.setJustify("center");
-label.setLines(3);
-label.setMaxWidthChars(40);
-label.setWidthChars(20);
 label.setXAlign(0.5);
 label.setYAlign(0.5);
-label.setIsSelectable(true);
-label.setIsSingleLineMode(false);
-label.setUseMarkup(true);
-label.setUseUnderline(true);
-label.setNaturalWrapMode("word");
 ```
 
 #### Entry
@@ -241,6 +304,7 @@ label.setNaturalWrapMode("word");
 var entry = $.getComponentById("myEntry");
 entry.setText("Default value");
 var text = entry.getText();
+entry.isPassword(true);
 ```
 
 #### Image
@@ -282,13 +346,24 @@ win.maximize();
 win.minimize();
 ```
 
+#### Universal Methods
+
+Available on all components:
+
+```javascript
+var comp = $.getComponentById("any");
+comp.setVisible(false);
+comp.addCssClass("highlighted");
+comp.removeCssClass("highlighted");
+```
+
 ### Component State
 
 Every component has a lazy `state` getter that reads the current widget state from GTK:
 
 ```javascript
 var btn = $.getComponentById("myButton");
-console.log(btn.state);  // { label: "Click Me", sensitive: true, ... }
+console.log(btn.state);
 ```
 
 ### Lifecycle
@@ -299,10 +374,10 @@ $.onReady(function() {
   console.log("I am ready!");
 });
 
-// Run code on exit
-$.onExit = function() {
+// Run code on exit (supports multiple callbacks)
+$.onExit(function() {
   console.log("Goodbye!");
-};
+});
 ```
 
 ### Async / Await
@@ -316,74 +391,193 @@ $.onReady(async function() {
 });
 ```
 
+## JSX Components
+
+### Setup
+
+Create a minimal HTML shell with a root container, then write your UI in `.jsx` files:
+
+```xml
+<Application applicationId="com.example.app">
+  <StyleSheet src="styles/index.css" />
+  <Window title="My App" width="800" height="600">
+    <Box id="root" orientation="vertical" expand="true" />
+  </Window>
+  <Script src="scripts/App.jsx" />
+</Application>
+```
+
+### Function Components
+
+Components are plain functions that return JSX:
+
+```jsx
+function Greeting({ name }) {
+  return (
+    <Box orientation="vertical">
+      <Label className="title">Hello, {name}!</Label>
+    </Box>
+  );
+}
+```
+
+### useState
+
+Manage component state with `useState`:
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <Box orientation="vertical">
+      <Label>Count: {count}</Label>
+      <Button onPress={function() { setCount(count + 1); }}>+1</Button>
+      <Button onPress={function() { setCount(0); }}>Reset</Button>
+    </Box>
+  );
+}
+```
+
+### useEffect
+
+Run side effects after render:
+
+```jsx
+function Timer() {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(function() {
+    console.log("Timer mounted");
+    return function() {
+      console.log("Timer unmounted");
+    };
+  }, []);
+
+  return <Label>Elapsed: {seconds}s</Label>;
+}
+```
+
+### Composing Components
+
+Nest components and pass props:
+
+```jsx
+function UserCard({ name, email }) {
+  return (
+    <Box orientation="vertical" className="card">
+      <Label className="name">{name}</Label>
+      <Label className="email">{email}</Label>
+    </Box>
+  );
+}
+
+function App() {
+  return (
+    <Box orientation="vertical">
+      <UserCard name="Giorgi" email="giorgi@example.com" />
+      <UserCard name="Alice" email="alice@example.com" />
+    </Box>
+  );
+}
+
+$.onReady(function() {
+  $.render("root", App);
+});
+```
+
+### Conditional Rendering
+
+```jsx
+function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  if (loggedIn) {
+    return <Label>Welcome back!</Label>;
+  }
+
+  return (
+    <Button onPress={function() { setLoggedIn(true); }}>
+      Sign In
+    </Button>
+  );
+}
+```
+
+### Event Handlers in JSX
+
+```jsx
+<Button onPress={handleClick}>Click Me</Button>
+<Entry onChange={function(text) { setQuery(text); }} />
+```
+
+### Mounting
+
+Mount your root component into a container defined in the HTML:
+
+```javascript
+$.onReady(function() {
+  $.render("root", App);
+});
+```
+
 ## Built-in Modules
 
 ### `$.fs` — File System
 
 ```javascript
-// Read a file
+// Read / write / append
 var content = await $.fs.read("/path/to/file.txt");
-
-// Write a file
 await $.fs.write("/path/to/file.txt", "Hello!");
-
-// Append to a file
 await $.fs.append("/path/to/log.txt", "New entry\n");
 
-// Check if a file exists
+// Check existence and delete
 var exists = await $.fs.exists("/path/to/file.txt");
-
-// Delete a file
 await $.fs.delete("/path/to/file.txt");
 
-// Create directories (recursive)
+// Directories
 await $.fs.mkdir("/path/to/new/dir");
-
-// List directory contents
 var entries = await $.fs.readdir("/path/to/dir");
-console.log(entries); // ["file1.txt", "file2.txt", "subdir"]
 
-// Get file information
+// File info
 var info = await $.fs.statistics("/path/to/file.txt");
-console.log(info.size);        // bytes
-console.log(info.isFile);      // true
-console.log(info.isDirectory); // false
-console.log(info.modifiedAt);  // unix timestamp
+console.log(info.size);
+console.log(info.isFile);
+console.log(info.isDirectory);
+console.log(info.modifiedAt);
 
-// Read/write binary data
+// Binary data
 await $.fs.writeBytes("/path/to/file.bin", new Uint8Array([0x89, 0x50, 0x4E, 0x47]));
-var bytes = await $.fs.readBytes("/path/to/file.bin"); // Uint8Array
+var bytes = await $.fs.readBytes("/path/to/file.bin");
 ```
 
-### `$.net` — Networking
+### `$.http` — Networking
 
 ```javascript
-// GET request
-var res = await $.net.get("https://api.example.com/data");
-console.log(res.status);  // 200
-console.log(res.body);    // response body string
-console.log(res.headers); // { "content-type": "application/json", ... }
+// GET
+var res = await $.http.get("https://api.example.com/data");
+console.log(res.status);
+console.log(res.body);
+console.log(res.headers);
 
 // GET with headers
-var res = await $.net.get("https://api.example.com/data", {
+var res = await $.http.get("https://api.example.com/data", {
   "Authorization": "Bearer token123"
 });
 
 // POST JSON
-var res = await $.net.post("https://api.example.com/users", {
-  name: "Giorgi",
-  email: "giorgi@example.com"
-}, {
-  "Content-Type": "application/json"
-});
+var res = await $.http.post("https://api.example.com/users",
+  JSON.stringify({ name: "Giorgi" }),
+  { "Content-Type": "application/json" }
+);
 
 // PUT, PATCH, DELETE
-await $.net.put(url, body, headers);
-await $.net.patch(url, body, headers);
-await $.net.delete(url, headers);
+await $.http.put(url, body, headers);
+await $.http.patch(url, body, headers);
+await $.http.delete(url, headers);
 
 // Generic request
-var res = await $.net.request({
+var res = await $.http.request({
   url: "https://api.example.com/resource",
   method: "PATCH",
   headers: { "Content-Type": "application/json" },
@@ -391,7 +585,7 @@ var res = await $.net.request({
 });
 
 // Download a file
-var dl = await $.net.download("https://example.com/image.png", "/tmp/image.png");
+var dl = await $.http.download("https://example.com/image.png", "/tmp/image.png");
 console.log("Downloaded " + dl.bytes + " bytes to " + dl.path);
 ```
 
@@ -400,7 +594,7 @@ console.log("Downloaded " + dl.bytes + " bytes to " + dl.path);
 All async module calls return an `error` field on failure instead of throwing:
 
 ```javascript
-var res = await $.net.get("https://invalid.example.com");
+var res = await $.http.get("https://invalid.example.com");
 if (res.error) {
   console.error("Request failed: " + res.error);
 }
@@ -419,8 +613,8 @@ Standard `console` methods are available:
 console.log("Info message");
 console.info("Same as log");
 console.debug("Same as log");
-console.warn("Warning message");   // prints to stderr with [WARN] prefix
-console.error("Error message");    // prints to stderr with [ERROR] prefix
+console.warn("Warning message");   // stderr with [WARN] prefix
+console.error("Error message");    // stderr with [ERROR] prefix
 
 // Objects are automatically JSON-serialized
 console.log({ key: "value" });     // {"key":"value"}
@@ -453,10 +647,11 @@ Sunflower exposes a UNIX socket for inter-process communication. External proces
 ### Example
 
 ```bash
-# The socket path is logged on startup
 echo '{"id":"1","directory":".","file":"repl","line":1,"sourceCode":"console.log($.componentIds)"}' \
   | socat - UNIX-CONNECT:/tmp/<socket-id>.sock
 ```
+
+The socket path is logged on startup.
 
 ## How It Works
 
@@ -482,6 +677,36 @@ A GLib timer fires every 16ms to:
 3. Drain the QuickJS job queue (so `await` continuations execute)
 
 This is the heartbeat that keeps async flowing between Crystal and JS without blocking the UI.
+
+### The JSX Transpiler
+
+When a `.jsx` file is loaded, Sunflower's built-in transpiler converts JSX syntax to `h()` function calls before passing the code to QuickJS. No external build tools needed.
+
+```jsx
+// Input
+<Box orientation="vertical">
+  <Label className="title">Hello</Label>
+</Box>
+
+// Output
+h("Box", { orientation: "vertical" },
+  h("Label", { className: "title" }, "Hello")
+)
+```
+
+Custom components (uppercase names not matching built-in widgets) are emitted as function references: `<MyComponent />` becomes `h(MyComponent, null)`.
+
+### The Reconciler
+
+In JSX mode, the Seed runtime includes a virtual DOM reconciler that diffs old and new component trees. When state changes:
+
+1. The component function re-runs, producing a new virtual DOM tree
+2. The reconciler walks old and new trees side by side
+3. Same element type → updates the existing GTK widget in-place (props, text, event handlers)
+4. Different type → destroys the old widget and creates a new one
+5. Entry widgets are never overwritten during updates to preserve user input
+
+This means `useState` triggers efficient in-place updates — not a full tear-down and rebuild.
 
 ## Contributing
 

@@ -65,7 +65,13 @@ module Sunflower
             tag: resolved
           )
         else
-          engine.load!(resolved)
+          if path.ends_with?(".jsx")
+            source = File.read(resolved)
+            transpiled = JavaScript::XML::Transpiler.transform(source)
+            engine.sandbox.eval_mutex!(transpiled, tag: resolved)
+          else
+            engine.load!(resolved)
+          end
         end
       end
 

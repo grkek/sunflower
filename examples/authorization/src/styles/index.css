@@ -93,6 +93,7 @@ window {
   padding: 10px;
   border: 1px solid #2a2a3a;
   min-height: 20px;
+  margin-bottom: 48px;
 }
 
 .secondary-button:hover {

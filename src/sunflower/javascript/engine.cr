@@ -192,6 +192,8 @@ module Sunflower
         register_promises
         register_fs_bindings
         register_http_bindings
+        register_widget_dispatch
+        register_seed_bindings
       end
 
       private def register_console : Nil
@@ -655,6 +657,508 @@ module Sunflower
           "  },\n" \
           "  download: function(url, path) {\n" \
           "    return __createPromise(__http_download(url, path));\n" \
+          "  }\n" \
+          "};\n"
+        )
+      end
+
+      private def register_seed_bindings : Nil
+        Log.debug { "Registering Seed runtime bindings" }
+
+        @sandbox.bind("__create_widget", 3) do |args|
+          parent_id = args[0].as_s
+          kind = args[1].as_s
+          props_json = args[2].as_s
+
+          props = JSON.parse(props_json)
+          id = props["id"]?.try(&.as_s) || Random::Secure.hex(8)
+          class_name = props["className"]?.try(&.as_s) || ""
+          window_id = "Main"
+
+          parent_component = Registry.instance.registered_components[parent_id]?
+          unless parent_component
+            Log.error { "Seed: parent #{parent_id} not found" }
+            next id
+          end
+
+          parent_widget = parent_component.widget
+
+          widget = case kind
+                   when "Box"
+                     orientation = case props["orientation"]?.try(&.as_s)
+                                   when "horizontal" then Gtk::Orientation::Horizontal
+                                   else                   Gtk::Orientation::Vertical
+                                   end
+                     spacing = props["spacing"]?.try(&.as_i?) || props["spacing"]?.try(&.as_s.to_i?) || 0
+                     homogeneous = props["homogeneous"]?.try(&.as_bool) || false
+                     Gtk::Box.new(orientation: orientation, spacing: spacing, homogeneous: homogeneous)
+                   when "Label"
+                     text = props["text"]?.try(&.as_s) || ""
+                     label = Gtk::Label.new(str: text)
+                     if wrap = props["wrap"]?.try(&.as_bool)
+                       label.wrap = wrap
+                     end
+                     label
+                   when "Button"
+                     text = props["text"]?.try(&.as_s) || ""
+                     Gtk::Button.new_with_label(text)
+                   when "Entry"
+                     entry = Gtk::Entry.new
+                     if text = props["text"]?.try(&.as_s)
+                       entry.text = text
+                     end
+                     if placeholder = props["placeHolder"]?.try(&.as_s)
+                       entry.placeholder_text = placeholder
+                     end
+                     if props["inputType"]?.try(&.as_s) == "password"
+                       entry.visibility = false
+                     end
+                     entry
+                   when "Image"
+                     Gtk::Picture.new
+                   when "ScrolledWindow"
+                     sw = Gtk::ScrolledWindow.new
+                     if props["expand"]?.try(&.as_bool)
+                       sw.vexpand = true
+                       sw.hexpand = true
+                     end
+                     sw
+                   when "HorizontalSeparator"
+                     Gtk::Separator.new(orientation: Gtk::Orientation::Horizontal)
+                   when "VerticalSeparator"
+                     Gtk::Separator.new(orientation: Gtk::Orientation::Vertical)
+                   when "Switch"
+                     Gtk::Switch.new
+                   else
+                     Log.warn { "Seed: unknown widget type '#{kind}', creating Box" }
+                     Gtk::Box.new(orientation: Gtk::Orientation::Vertical)
+                   end
+
+          # Apply common properties
+          widget.name = id
+
+          if props["expand"]?.try(&.as_bool)
+            widget.vexpand = true
+            widget.hexpand = true
+          end
+
+          if halign = props["horizontalAlignment"]?.try(&.as_s)
+            widget.halign = case halign.downcase
+                            when "center" then Gtk::Align::Center
+                            when "start"  then Gtk::Align::Start
+                            when "end"    then Gtk::Align::End
+                            when "fill"   then Gtk::Align::Fill
+                            else               Gtk::Align::Fill
+                            end
+          end
+
+          if valign = props["verticalAlignment"]?.try(&.as_s)
+            widget.valign = case valign.downcase
+                            when "center" then Gtk::Align::Center
+                            when "start"  then Gtk::Align::Start
+                            when "end"    then Gtk::Align::End
+                            when "fill"   then Gtk::Align::Fill
+                            else               Gtk::Align::Fill
+                            end
+          end
+
+          # Add CSS class
+          unless class_name.empty?
+            widget.add_css_class(class_name)
+          end
+
+          # Connect widget-specific signals
+          captured_id = id
+          case widget
+          when Gtk::Button
+            widget.clicked_signal.connect do
+              component = Registry.instance.registered_components[captured_id]?
+              component.try(&.dispatch_event("press"))
+            end
+          when Gtk::Entry
+            widget.buffer.inserted_text_signal.connect do
+              component = Registry.instance.registered_components[captured_id]?
+              component.try(&.dispatch_event("change", "\"#{widget.text}\""))
+            end
+            widget.buffer.deleted_text_signal.connect do
+              component = Registry.instance.registered_components[captured_id]?
+              component.try(&.dispatch_event("change", "\"#{widget.text}\""))
+            end
+          when Gtk::Switch
+            widget.notify_signal["active"].connect do
+              component = Registry.instance.registered_components[captured_id]?
+              component.try(&.dispatch_event("change", widget.active?.to_s))
+            end
+          end
+
+          # Append to parent
+          case parent_widget
+          when Gtk::Box
+            parent_widget.append(widget)
+          when Gtk::ScrolledWindow
+            parent_widget.child = widget
+          when Gtk::ListBox
+            parent_widget.append(widget)
+          else
+            Log.warn { "Seed: cannot append to #{parent_widget.class}" }
+          end
+
+          # Register as a component so JS can interact with it
+          component = Component.new(
+            id: id,
+            class_name: class_name,
+            kind: kind,
+            widget: widget,
+            window_id: window_id
+          )
+          Registry.instance.register(component)
+
+          Log.debug { "Seed: created #{kind}##{id} in #{parent_id}" }
+          id
+        end
+
+        @sandbox.bind("__destroy_widget", 1) do |args|
+          widget_id = args[0].as_s
+
+          if component = Registry.instance.registered_components[widget_id]?
+            widget = component.widget
+
+            if parent = widget.parent
+              case parent
+              when Gtk::Box
+                parent.remove(widget)
+              when Gtk::ScrolledWindow
+                parent.child = Pointer(Void).null.as(Gtk::Widget)
+              when Gtk::ListBox
+                parent.remove(widget)
+              else
+                Log.warn { "Seed: cannot remove from #{parent.class}" }
+              end
+            end
+
+            Registry.instance.unregister(widget_id)
+            Log.debug { "Seed: destroyed #{widget_id}" }
+          end
+
+          nil
+        end
+
+        # Load the Seed runtime JS
+        runtime_path = File.join(__DIR__, "..", "..", "runtime", "seed.js")
+        if File.exists?(runtime_path)
+          Log.debug { "Seed: loading runtime from #{runtime_path}" }
+          @sandbox.eval_mutex!(File.read(runtime_path))
+        else
+          Log.warn { "Seed: runtime not found at #{runtime_path}" }
+        end
+      end
+
+      # In register_core_bindings, add:
+      private def register_widget_dispatch : Nil
+        Log.debug { "Registering widget dispatch bindings" }
+
+        # Label methods
+        @sandbox.bind("__widget_setText", 2) do |args|
+          id = args[0].as_s
+          text = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          case comp.widget
+          when Gtk::Label  then comp.widget.as(Gtk::Label).text = text
+          when Gtk::Button then comp.widget.as(Gtk::Button).label = text
+          when Gtk::Entry  then comp.widget.as(Gtk::Entry).text = text
+          end
+          text
+        end
+
+        @sandbox.bind("__widget_setLabel", 2) do |args|
+          id = args[0].as_s
+          text = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if label = comp.widget.as?(Gtk::Label)
+            label.label = text
+          end
+          text
+        end
+
+        @sandbox.bind("__widget_getText", 1) do |args|
+          id = args[0].as_s
+          comp = Registry.instance.registered_components[id]?
+          next "" unless comp
+          case comp.widget
+          when Gtk::Entry then comp.widget.as(Gtk::Entry).text
+          when Gtk::Label then comp.widget.as(Gtk::Label).text
+          else                 ""
+          end
+        end
+
+        @sandbox.bind("__widget_setVisible", 2) do |args|
+          id = args[0].as_s
+          visible = args[1].as_bool
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          comp.widget.visible = visible
+          visible
+        end
+
+        @sandbox.bind("__widget_addCssClass", 2) do |args|
+          id = args[0].as_s
+          cls = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          comp.widget.add_css_class(cls)
+          nil
+        end
+
+        @sandbox.bind("__widget_removeCssClass", 2) do |args|
+          id = args[0].as_s
+          cls = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          comp.widget.remove_css_class(cls)
+          nil
+        end
+
+        # Box methods
+        @sandbox.bind("__widget_append", 2) do |args|
+          id = args[0].as_s
+          child_id = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          child = Registry.instance.registered_components[child_id]?
+          next false unless comp && child
+          if box = comp.widget.as?(Gtk::Box)
+            box.append(child.widget)
+            true
+          else
+            false
+          end
+        end
+
+        @sandbox.bind("__widget_destroyChildren", 1) do |args|
+          id = args[0].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if box = comp.widget.as?(Gtk::Box)
+            box.children.each { |child| box.remove(child) }
+          end
+          nil
+        end
+
+        # Entry specific
+        @sandbox.bind("__widget_isPassword", 2) do |args|
+          id = args[0].as_s
+          is_pw = args[1].as_bool
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if entry = comp.widget.as?(Gtk::Entry)
+            entry.visibility = !is_pw
+          end
+          is_pw
+        end
+
+        # Window methods
+        @sandbox.bind("__widget_setTitle", 2) do |args|
+          id = args[0].as_s
+          title = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if window = comp.widget.as?(Gtk::ApplicationWindow)
+            window.title = title
+          end
+          title
+        end
+
+        @sandbox.bind("__widget_maximize", 1) do |args|
+          id = args[0].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if window = comp.widget.as?(Gtk::ApplicationWindow)
+            window.maximize
+          end
+          nil
+        end
+
+        @sandbox.bind("__widget_minimize", 1) do |args|
+          id = args[0].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if window = comp.widget.as?(Gtk::ApplicationWindow)
+            window.minimize
+          end
+          nil
+        end
+
+        # ListBox methods
+        @sandbox.bind("__widget_removeAll", 1) do |args|
+          id = args[0].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if list_box = comp.widget.as?(Gtk::ListBox)
+            list_box.remove_all
+          end
+          nil
+        end
+
+        # Label specific methods
+        @sandbox.bind("__widget_setWrap", 2) do |args|
+          id = args[0].as_s
+          wrap = args[1].as_bool
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if label = comp.widget.as?(Gtk::Label)
+            label.wrap = wrap
+          end
+          wrap
+        end
+
+        @sandbox.bind("__widget_setEllipsize", 2) do |args|
+          id = args[0].as_s
+          mode = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if label = comp.widget.as?(Gtk::Label)
+            label.ellipsize = Pango::EllipsizeMode.parse(mode)
+          end
+          mode
+        end
+
+        @sandbox.bind("__widget_setXAlign", 2) do |args|
+          id = args[0].as_s
+          align = args[1].as_f64
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if label = comp.widget.as?(Gtk::Label)
+            label.xalign = align.to_f32
+          end
+          align
+        end
+
+        @sandbox.bind("__widget_setYAlign", 2) do |args|
+          id = args[0].as_s
+          align = args[1].as_f64
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if label = comp.widget.as?(Gtk::Label)
+            label.yalign = align.to_f32
+          end
+          align
+        end
+
+        # Image methods
+        @sandbox.bind("__widget_setResourcePath", 2) do |args|
+          id = args[0].as_s
+          url = args[1].as_s
+          promise_id = Random::Secure.hex(8)
+          comp = Registry.instance.registered_components[id]?
+
+          unless comp
+            resolve_promise(promise_id)
+            next promise_id
+          end
+
+          image = comp.widget.as(Gtk::Picture)
+
+          if url.starts_with?("http")
+            spawn do
+              begin
+                resolved_url = url
+                5.times do
+                  response = HTTP::Client.get(resolved_url)
+                  if response.status.redirection? && (location = response.headers["Location"]?)
+                    resolved_url = location
+                  else
+                    if response.success?
+                      bytes = response.body.to_slice
+                      glib_bytes = GLib::Bytes.new(bytes.to_unsafe, bytes.size)
+                      texture = Gdk::Texture.new_from_bytes(glib_bytes)
+                      image.paintable = texture
+                    end
+                    break
+                  end
+                end
+              rescue ex
+                Log.error { "Failed to load image #{url}: #{ex.message}" }
+              end
+              resolve_promise(promise_id)
+            end
+          else
+            image.file = Gio::File.new_for_path(url)
+            resolve_promise(promise_id)
+          end
+
+          promise_id
+        end
+
+        @sandbox.bind("__widget_setContentFit", 2) do |args|
+          id = args[0].as_s
+          fit = args[1].as_s
+          comp = Registry.instance.registered_components[id]?
+          next nil unless comp
+          if image = comp.widget.as?(Gtk::Picture)
+            image.content_fit = case fit.downcase
+                                when "fill"    then Gtk::ContentFit::Fill
+                                when "contain" then Gtk::ContentFit::Contain
+                                when "cover"   then Gtk::ContentFit::Cover
+                                when "none"    then Gtk::ContentFit::ScaleDown
+                                else                Gtk::ContentFit::Contain
+                                end
+          end
+          fit
+        end
+
+        # Install JS-side method wrappers on component registration
+        @sandbox.eval_mutex!(
+          "globalThis.__installMethods = function(comp) {\n" \
+          "  var id = comp.id;\n" \
+          "  var kind = comp.kind;\n" \
+          "\n" \
+          "  // Universal methods\n" \
+          "  comp.setVisible = function(v) { return __widget_setVisible(id, v); };\n" \
+          "  comp.addCssClass = function(c) { return __widget_addCssClass(id, c); };\n" \
+          "  comp.removeCssClass = function(c) { return __widget_removeCssClass(id, c); };\n" \
+          "\n" \
+          "  if (kind === 'LABEL') {\n" \
+          "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
+          "    comp.setLabel = function(t) { return __widget_setLabel(id, t); };\n" \
+          "    comp.setWrap = function(w) { return __widget_setWrap(id, w); };\n" \
+          "    comp.setEllipsize = function(m) { return __widget_setEllipsize(id, m); };\n" \
+          "    comp.setXAlign = function(a) { return __widget_setXAlign(id, a); };\n" \
+          "    comp.setYAlign = function(a) { return __widget_setYAlign(id, a); };\n" \
+          "    comp.getText = function() { return __widget_getText(id); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'BUTTON') {\n" \
+          "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'ENTRY') {\n" \
+          "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
+          "    comp.getText = function() { return __widget_getText(id); };\n" \
+          "    comp.isPassword = function(v) { return __widget_isPassword(id, v); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'BOX') {\n" \
+          "    comp.append = function(childId) { return __widget_append(id, childId); };\n" \
+          "    comp.destroyChildren = function() { return __widget_destroyChildren(id); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'IMAGE') {\n" \
+          "    comp.setResourcePath = function(path) {\n" \
+          "      var pid = __widget_setResourcePath(id, path);\n" \
+          "      return __createPromise(pid);\n" \
+          "    };\n" \
+          "    comp.setContentFit = function(f) { return __widget_setContentFit(id, f); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'WINDOW') {\n" \
+          "    comp.setTitle = function(t) { return __widget_setTitle(id, t); };\n" \
+          "    comp.maximize = function() { return __widget_maximize(id); };\n" \
+          "    comp.minimize = function() { return __widget_minimize(id); };\n" \
+          "  }\n" \
+          "\n" \
+          "  if (kind === 'LISTBOX') {\n" \
+          "    comp.removeAll = function() { return __widget_removeAll(id); };\n" \
           "  }\n" \
           "};\n"
         )
