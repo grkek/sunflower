@@ -97,6 +97,11 @@ module Sunflower
     private def register_box_callbacks(sandbox : Medusa::Sandbox) : Nil
       box = widget.as(Gtk::Box)
 
+      bind_method(sandbox, "setVisible", 1) do |args|
+        box.visible = args[0].as_bool
+        args[0].as_bool
+      end
+
       bind_method(sandbox, "append", 1) do |args|
         child_id = args[0].as_s
         if child = Registry.instance.registered_components[child_id]?
@@ -208,6 +213,11 @@ module Sunflower
 
     private def register_label_callbacks(sandbox : Medusa::Sandbox) : Nil
       label = widget.as(Gtk::Label)
+
+      bind_method(sandbox, "setVisible", 1) do |args|
+        label.visible = args[0].as_bool
+        args[0].as_bool
+      end
 
       bind_method(sandbox, "setLabel", 1) do |args|
         label.label = args[0].as_s

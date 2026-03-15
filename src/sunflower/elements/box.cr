@@ -24,7 +24,7 @@ module Sunflower
         box = Attributes::Box.from_json(attributes.to_json)
         container_attributes = Sunflower::Attributes::Container.from_json(attributes.to_json)
 
-        widget = Gtk::Box.new(name: box.id, orientation: box.orientation, spacing: box.spacing, halign: box.horizontal_alignment, valign: box.vertical_alignment, homogeneous: container_attributes.homogeneous?)
+        widget = Gtk::Box.new(name: box.id, orientation: box.orientation, spacing: box.spacing, halign: box.horizontal_alignment, valign: box.vertical_alignment, homogeneous: container_attributes.homogeneous?, visible: box.visible?)
 
         register_events(widget)
         containerize(parent, widget, container_attributes)

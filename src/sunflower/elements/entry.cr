@@ -16,8 +16,8 @@ module Sunflower
         @[JSON::Field(key: "passwordCharacter")]
         property password_character : String?
 
-        @[JSON::Field(key: "isVisible")]
-        property? visible : Bool = true
+        @[JSON::Field(key: "isPassword")]
+        property? password : Bool = false
       end
     end
 
@@ -33,7 +33,7 @@ module Sunflower
         entry = Attributes::Entry.from_json(attributes.to_json)
         container_attributes = Sunflower::Attributes::Container.from_json(attributes.to_json)
 
-        widget = Gtk::Entry.new(name: entry.id, text: entry.text, placeholder_text: entry.place_holder, invisible_char: entry.password_character.try(&.bytes.first.to_u32), visibility: entry.visible?, halign: entry.horizontal_alignment, valign: entry.vertical_alignment)
+        widget = Gtk::Entry.new(name: entry.id, text: entry.text, placeholder_text: entry.place_holder, invisible_char: entry.password_character.try(&.bytes.first.to_u32), visibility: !entry.password?, halign: entry.horizontal_alignment, valign: entry.vertical_alignment)
 
         register_events(widget)
         containerize(parent, widget, container_attributes)

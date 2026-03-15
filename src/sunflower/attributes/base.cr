@@ -6,6 +6,9 @@ module Sunflower
       @[JSON::Field(key: "id")]
       property id : String
 
+      @[JSON::Field(key: "isVisible")]
+      property? visible : Bool = true
+
       @[JSON::Field(key: "className")]
       property class_name : String = Helpers::Randomizer.random_string
 

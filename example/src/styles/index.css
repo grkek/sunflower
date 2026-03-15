@@ -1,5 +1,6 @@
 window {
   background-color: #0f0f13;
+  min-width: 500px;
 }
 
 .app-title {
