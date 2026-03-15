@@ -689,15 +689,15 @@ module Sunflower
                                    when "horizontal" then Gtk::Orientation::Horizontal
                                    else                   Gtk::Orientation::Vertical
                                    end
-                     spacing = props["spacing"]?.try(&.as_i?) || props["spacing"]?.try(&.as_s.to_i?) || 0
-                     homogeneous = props["homogeneous"]?.try(&.as_bool) || false
+                     spacing = (props["spacing"]?.try(&.as_i?) || props["spacing"]?.try(&.as_s.to_i?)) || 0
+                     homogeneous = (props["homogeneous"]?.try(&.as_bool?) || props["homogeneous"]?.try(&.as_s) == "true")
+                     expand = (props["expand"]?.try(&.as_bool?) || props["expand"]?.try(&.as_s) == "true")
                      Gtk::Box.new(orientation: orientation, spacing: spacing, homogeneous: homogeneous)
                    when "Label"
                      text = props["text"]?.try(&.as_s) || ""
                      label = Gtk::Label.new(str: text)
-                     if wrap = props["wrap"]?.try(&.as_bool)
-                       label.wrap = wrap
-                     end
+                     wrap = (props["wrap"]?.try(&.as_bool?) || props["wrap"]?.try(&.as_s) == "true")
+
                      label
                    when "Button"
                      text = props["text"]?.try(&.as_s) || ""
@@ -718,10 +718,12 @@ module Sunflower
                      Gtk::Picture.new
                    when "ScrolledWindow"
                      sw = Gtk::ScrolledWindow.new
-                     if props["expand"]?.try(&.as_bool)
+
+                     if (props["expand"]?.try(&.as_bool?) || props["expand"]?.try(&.as_s) == "true")
                        sw.vexpand = true
                        sw.hexpand = true
                      end
+
                      sw
                    when "HorizontalSeparator"
                      Gtk::Separator.new(orientation: Gtk::Orientation::Horizontal)
@@ -737,7 +739,7 @@ module Sunflower
           # Apply common properties
           widget.name = id
 
-          if props["expand"]?.try(&.as_bool)
+          if (props["expand"]?.try(&.as_bool?) || props["expand"]?.try(&.as_s) == "true")
             widget.vexpand = true
             widget.hexpand = true
           end

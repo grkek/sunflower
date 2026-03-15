@@ -145,73 +145,66 @@ module Sunflower
         private def read_expression_value : String
           advance # {
           depth = 1
-          start = @pos
+          result = IO::Memory.new
 
           while @pos < @source.size && depth > 0
             case current
-            when '{' then depth += 1
-            when '}' then depth -= 1
+            when '{'
+              depth += 1
+              result << current
+              advance
+            when '}'
+              depth -= 1
+              if depth > 0
+                result << current
+                advance
+              end
             when '"', '\''
-              skip_string(current)
-              next
+              quote = current
+              result << current
+              advance
+              while @pos < @source.size && current != quote
+                result << current
+                advance if current == '\\'
+                result << current if current == '\\'
+                advance
+              end
+              result << current if @pos < @source.size # closing quote
+              advance
             when '`'
-              skip_template_literal
-              next
+              result << current
+              advance
+              while @pos < @source.size && current != '`'
+                if current == '\\'
+                  result << current
+                  advance
+                end
+                result << current
+                advance
+              end
+              result << current if @pos < @source.size # closing backtick
+              advance
             when '<'
-              # Check for JSX inside expressions like {condition ? <Tag /> : null}
-              if depth == 1 && @pos + 1 < @source.size && @source[@pos + 1].uppercase?
-                # Emit what we have so far as raw JS
-                prefix = @source[start...@pos]
-
-                # Transpile the JSX tag
+              if @pos + 1 < @source.size && @source[@pos + 1].uppercase?
+                # JSX inside expression — transpile it
                 child_output = IO::Memory.new
                 old_output = @output
                 @output = child_output
                 transpile_jsx
                 @output = old_output
-
-                # Restart tracking from current position
-                result = prefix + child_output.to_s
-
-                # Continue reading the rest of the expression
-                rest_start = @pos
-                while @pos < @source.size && depth > 0
-                  case current
-                  when '{' then depth += 1
-                  when '}' then depth -= 1
-                  when '"', '\''
-                    skip_string(current)
-                    next
-                  when '`'
-                    skip_template_literal
-                    next
-                  when '<'
-                    if depth == 1 && @pos + 1 < @source.size && @source[@pos + 1].uppercase?
-                      mid = @source[rest_start...@pos]
-                      old_output2 = @output
-                      child_output2 = IO::Memory.new
-                      @output = child_output2
-                      transpile_jsx
-                      @output = old_output2
-                      result += mid + child_output2.to_s
-                      rest_start = @pos
-                      next
-                    end
-                  end
-                  advance if depth > 0
-                end
-
-                result += @source[rest_start...@pos]
-                advance if @pos < @source.size # closing }
-                return result.strip
+                result << child_output.to_s
+              else
+                result << current
+                advance
               end
+            else
+              result << current
+              advance
             end
-            advance if depth > 0
           end
 
-          expr = @source[start...@pos]
           advance if @pos < @source.size # closing }
-          expr.strip
+          result.to_s.strip
         end
 
         # Read children between <Tag> and </Tag>
