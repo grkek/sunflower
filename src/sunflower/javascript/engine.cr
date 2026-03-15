@@ -91,17 +91,14 @@ module Sunflower
           "globalThis.$ = {\n" \
           "  windows: {},\n" \
           "\n" \
-          "  // Shortcut to the main ApplicationWindow\n" \
           "  get mainWindow() {\n" \
           "    return this.windows['Main'] || null;\n" \
           "  },\n" \
           "\n" \
-          "  // Get a window by id\n" \
           "  getWindow: function(id) {\n" \
           "    return this.windows[id] || null;\n" \
           "  },\n" \
           "\n" \
-          "  // Get a component from a all or specific window(s)\n" \
           "  getComponentById: function(componentId, windowId) {\n" \
           "    if (windowId) {\n" \
           "      var window = this.windows[windowId];\n" \
@@ -116,7 +113,6 @@ module Sunflower
           "    return null;\n" \
           "  },\n" \
           "\n" \
-          "  // Search all windows for a component\n" \
           "  findComponentById: function(componentId) {\n" \
           "    for (var key in this.windows) {\n" \
           "      var window = this.windows[key];\n" \
@@ -127,7 +123,6 @@ module Sunflower
           "    return null;\n" \
           "  },\n" \
           "\n" \
-          "  // Get all component ids across all windows\n" \
           "  get componentIds() {\n" \
           "    var ids = [];\n" \
           "    for (var key in this.windows) {\n" \
@@ -139,13 +134,12 @@ module Sunflower
           "    return ids;\n" \
           "  },\n" \
           "\n" \
-          "  // Get all window ids\n" \
           "  get windowIds() {\n" \
           "    return Object.keys(this.windows);\n" \
           "  },\n" \
           "\n" \
-          "  // Ready state\n" \
           "  _readyCallbacks: [],\n" \
+          "  _exitCallbacks: [],\n" \
           "  _isReady: false,\n" \
           "\n" \
           "  onReady: function(callback) {\n" \
@@ -162,6 +156,16 @@ module Sunflower
           "      this._readyCallbacks[i]();\n" \
           "    }\n" \
           "    this._readyCallbacks = [];\n" \
+          "  },\n" \
+          "\n" \
+          "  onExit: function(callback) {\n" \
+          "    this._exitCallbacks.push(callback);\n" \
+          "  },\n" \
+          "\n" \
+          "  _flushExit: function() {\n" \
+          "    for (var i = 0; i < this._exitCallbacks.length; i++) {\n" \
+          "      this._exitCallbacks[i]();\n" \
+          "    }\n" \
           "  }\n" \
           "};\n"
         )
@@ -171,6 +175,12 @@ module Sunflower
       def flush_ready : Nil
         Log.debug { "Flushing onReady callbacks" }
         @sandbox.eval_mutex!("$._flushReady();")
+      end
+
+      # Called by the builder after exit — flushes all $.onExit callbacks.
+      def flush_exit : Nil
+        Log.debug { "Flushing onExit callbacks" }
+        @sandbox.eval_mutex!("$._flushExit();")
       end
 
       private def register_core_bindings : Nil
@@ -377,7 +387,6 @@ module Sunflower
 
           promise_id
         end
-
 
         @sandbox.bind("__fs_write_bytes", 2) do |args|
           path = args[0].as_s
@@ -605,7 +614,7 @@ module Sunflower
               if response.success?
                 File.write(path, response.body)
                 resolve_promise(promise_id, {
-                  okay:    true,
+                  okay:  true,
                   bytes: response.body.bytesize,
                   path:  path,
                 }.to_json)

@@ -130,6 +130,16 @@ module Sunflower
         args[0].as_s
       end
 
+      bind_method(sandbox, "isPassword", 1) do |args|
+        entry.visibility = args[0].as_bool
+        args[0].as_bool
+      end
+
+      bind_method(sandbox, "setPasswordCharacter", 1) do |args|
+        entry.invisible_char = args[0].as_s[0]
+        args[0].as_s
+      end
+
       bind_method(sandbox, "getText", 0) do |_args|
         entry.text
       end

@@ -75,7 +75,7 @@ module Sunflower
 
       window.close_request_signal.connect do
         begin
-          JavaScript::Engine.instance.sandbox.eval_mutex!("if ($.onExit) $.onExit();")
+          JavaScript::Engine.instance.flush_exit
         rescue
         end
 
@@ -145,8 +145,9 @@ module Sunflower
       end
 
       if path = child.attributes["src"]?
-        Log.debug { "Loading stylesheet: #{path}" }
-        css_provider.load_from_path(path.to_s)
+        resolved = File.expand_path(path.to_s, @base_dir)
+        Log.debug { "Loading stylesheet: #{resolved}" }
+        css_provider.load_from_path(resolved)
       end
 
       if display = Gdk::Display.default

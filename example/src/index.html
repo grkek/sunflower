@@ -1,68 +1,35 @@
-<Application>
-  <StyleSheet>
-    .gallery-window {
-      background-color: #1a1a2e;
-    }
+<Application applicationId="com.tilo.desktop">
+  <StyleSheet src="styles/index.css"/>
+  <Script src="scripts/index.js"/>
 
-    .gallery-title {
-      color: #000;
-      font-size: 24px;
-      font-weight: bold;
-      padding: 16px;
-    }
-
-    .gallery-container {
-      padding: 12px;
-    }
-
-    .gallery-image {
-      border-radius: 8px;
-      margin: 8px;
-      min-height: 200px;
-      min-width: 200px;
-    }
-
-    .status-label {
-      color: #a0a0a0;
-      font-size: 12px;
-      padding: 8px 16px;
-    }
-
-    .nav-button {
-      align: center;
-      margin: 4px;
-      padding: 8px 16px;
-    }
-  </StyleSheet>
-
-  <Window title="Sunflower Gallery" width="900" height="700">
+  <Window title="Sunflower" width="800" height="600">
     <Box orientation="vertical" expand="true">
-      <Label id="title" className="gallery-title">Sunflower Gallery</Label>
 
-      <Box orientation="horizontal" className="gallery-container" horizontalAlignment="center">
-        <Button id="prevBtn" className="nav-button">← Previous</Button>
-        <Label id="pageLabel" className="status-label">Page 1</Label>
-        <Button id="nextBtn" className="nav-button">Next →</Button>
+      <Box orientation="vertical" horizontalAlignment="center">
+        <Label className="app-title">Sunflower</Label>
+        <Label className="app-subtitle">Sign in to continue</Label>
       </Box>
 
-      <ScrolledWindow expand="true">
-        <Box id="imageGrid" orientation="vertical" spacing="8">
-          <Box orientation="horizontal" spacing="8" homogeneous="true">
-            <Image id="img1" className="gallery-image"/>
-            <Image id="img2" className="gallery-image" />
-            <Image id="img3" className="gallery-image" />
-          </Box>
-          <Box orientation="horizontal" spacing="8" homogeneous="true">
-            <Image id="img4" className="gallery-image" />
-            <Image id="img5" className="gallery-image" />
-            <Image id="img6" className="gallery-image" />
-          </Box>
-        </Box>
-      </ScrolledWindow>
+      <HorizontalSeparator className="divider" />
 
-      <Label id="statusLabel" className="status-label">Ready</Label>
+      <Box orientation="vertical" expand="true" horizontalAlignment="center" className="form-wrapper">
+        <Label className="field-label">Username</Label>
+        <Entry id="usernameEntry" className="field-input" />
+
+        <Label className="field-label">Password</Label>
+        <Entry id="passwordEntry" className="field-input" isVisible="false" />
+
+        <Button id="joinButton" className="primary-button">Sign In</Button>
+
+        <HorizontalSeparator className="divider-thin" />
+
+        <Button id="registerButton" className="secondary-button">Create Account</Button>
+      </Box>
+
+      <Box orientation="vertical" horizontalAlignment="center" className="footer">
+        <Label className="footer-text">By continuing, you agree to our Terms of Service</Label>
+      </Box>
+
     </Box>
   </Window>
-
-  <Script src="scripts/index.js" />
 </Application>

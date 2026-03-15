@@ -280,6 +280,7 @@ module Sunflower
           end
           nil
         when "Script"             then Script.new(attributes)
+        when "StyleSheet"          then StyleSheet.new(attributes)
         when "Entry"              then Entry.new(attributes)
         when "Spinner"            then Spinner.new(attributes)
         when "ProgressBar"        then ProgressBar.new(attributes)
