@@ -386,11 +386,7 @@
     if (vnode._fiberId) {
       var fiber = _fibers[vnode._fiberId];
       if (fiber) {
-        if (fiber.vnode) {
-          _destroyNode(fiber.vnode);
-          fiber.vnode = null;
-        }
-
+        if (fiber.vnode) _destroyNode(fiber.vnode);
         var effects = _effectStates[fiber.id];
         if (effects) {
           for (var i = 0; i < effects.length; i++) {
@@ -408,14 +404,46 @@
 
     if (vnode.children) {
       for (var i = 0; i < vnode.children.length; i++) {
-        _destroyNode(vnode.children[i]);
+        _cleanupNode(vnode.children[i]);
       }
     }
 
     if (vnode._widgetId) {
-      try {
-        __destroy_widget(vnode._widgetId);
-      } catch (e) { }
+      try { __destroy_widget(vnode._widgetId); } catch (e) { }
+      vnode._widgetId = null;
+    }
+  }
+
+  function _cleanupNode(vnode) {
+    if (!vnode || typeof vnode === 'string' || typeof vnode === 'number') return;
+
+    if (vnode._fiberId) {
+      var fiber = _fibers[vnode._fiberId];
+      if (fiber) {
+        if (fiber.vnode) _cleanupNode(fiber.vnode);
+        var effects = _effectStates[fiber.id];
+        if (effects) {
+          for (var i = 0; i < effects.length; i++) {
+            if (effects[i] && typeof effects[i].cleanup === 'function') {
+              effects[i].cleanup();
+            }
+          }
+          delete _effectStates[fiber.id];
+        }
+        delete _hookStates[fiber.id];
+        delete _fibers[vnode._fiberId];
+      }
+      return;
+    }
+
+    if (vnode.children) {
+      for (var i = 0; i < vnode.children.length; i++) {
+        _cleanupNode(vnode.children[i]);
+      }
+    }
+
+    if (vnode._widgetId) {
+      try { __unregister_widget(vnode._widgetId); } catch (e) { }
       vnode._widgetId = null;
     }
   }

@@ -834,19 +834,17 @@ module Sunflower
 
           if component = Registry.instance.registered_components[widget_id]?
             widget = component.widget
-
-            begin
-              if widget.parent
-                widget.unparent
-              end
-            rescue
-              # Widget already destroyed by parent
-            end
-
+            widget.unparent if widget.parent
             Registry.instance.unregister(widget_id)
             Log.debug { "Seed: destroyed #{widget_id}" }
           end
 
+          nil
+        end
+
+        @sandbox.bind("__unregister_widget", 1) do |args|
+          widget_id = args[0].as_s
+          Registry.instance.unregister(widget_id)
           nil
         end
 
