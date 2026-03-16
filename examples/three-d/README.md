@@ -1,5 +1,5 @@
 # Cube
 
 ```bash
-crystal run ./examples/cube/application.cr -Dpreview_mt
+crystal run ./examples/three-d/application.cr -Dpreview_mt
 ```
