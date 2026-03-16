@@ -1,3 +1,5 @@
+# src/sunflower/javascript/standard_library/canvas.cr
+#
 # 2D game engine module using OpenGL via GTK4's GLArea.
 # All rendering is batched and GPU-accelerated.
 #
@@ -28,6 +30,7 @@ module Sunflower
           property mouse_y : Float64 = 0.0
           property mouse_down : Bool = false
           property renderer : Graphics::Renderer = Graphics::Renderer.new
+          property text_renderer : Graphics::TextRenderer = Graphics::TextRenderer.new
 
           @@canvases = {} of String => State
 
@@ -395,6 +398,7 @@ module Sunflower
           gl_area.realize_signal.connect do
             gl_area.make_current
             state.renderer.initialize_gl
+            state.text_renderer.setup(gl_area)
           end
 
           gl_area.render_signal.connect do |context|
@@ -424,11 +428,11 @@ module Sunflower
               when FillTriangleCommand
                 renderer.fill_triangle(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a)
               when FillTextCommand
-                # Text rendering with GL requires font atlas — for now render as nil
-                nil
+                state.text_renderer.render(renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
               end
             end
 
+            state.text_renderer.tick
             renderer.end_frame
             true
           end

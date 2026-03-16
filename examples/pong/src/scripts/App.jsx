@@ -128,14 +128,14 @@ function PongGame() {
   }
 
   return (
-    <Box orientation="vertical" expand="true">
-      <Box orientation="horizontal" horizontalAlignment="center" spacing="32" className="header">
+    <Box orientation="vertical" expand={true}>
+      <Box orientation="horizontal" horizontalAlignment="center" spacing={32} className="header">
         <Label className="score-blue">{String(scores[0])}</Label>
         <Label className="app-name">Pong</Label>
         <Label className="score-red">{String(scores[1])}</Label>
       </Box>
-      <Canvas id="pong" expand="true" />
-      <Box orientation="horizontal" horizontalAlignment="center" spacing="8" className="nav-bar">
+      <Canvas id="pong" expand={true} />
+      <Box orientation="horizontal" horizontalAlignment="center" spacing={8} className="nav-bar">
         <Label className="card-body">Blue: W/S</Label>
         <Label className="card-body">Red: Up/Down</Label>
         <Label className="card-body">Restart: R</Label>

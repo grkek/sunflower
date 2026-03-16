@@ -42,6 +42,7 @@ lib LibGL
 
   # Uniforms
   fun glGetUniformLocation(program : UInt32, name : UInt8*) : Int32
+  fun glUniform1i(location : Int32, v0 : Int32)
   fun glUniform1f(location : Int32, v0 : Float32)
   fun glUniform2f(location : Int32, v0 : Float32, v1 : Float32)
   fun glUniform3f(location : Int32, v0 : Float32, v1 : Float32, v2 : Float32)

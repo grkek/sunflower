@@ -111,7 +111,7 @@ module Sunflower
         # Orthographic projection: (0,0) top-left, (width,height) bottom-right
         proj = orthographic(0_f32, @width, @height, 0_f32, -1_f32, 1_f32)
         LibGL.glUniformMatrix4fv(@projection_loc, 1, LibGL::GL_FALSE, proj.to_unsafe)
-        LibGL.glUniform1f(@use_texture_loc, 0_f32)
+        LibGL.glUniform1i(@use_texture_loc, 0)
       end
 
       def end_frame : Nil
@@ -202,7 +202,45 @@ module Sunflower
         push_vertex(x3.to_f32, y3.to_f32, r, g, b, a)
       end
 
+      # Draw a textured quad — used for text rendering.
+      # The texture contains white text on transparent background.
+      # The color (r, g, b, a) tints it via the shader: FragColor = texture * vColor.
+      def draw_textured_quad(
+        texture_id : UInt32,
+        x : Float64, y : Float64,
+        w : Float64, h : Float64,
+        r : Float64, g : Float64, b : Float64, a : Float64 = 1.0
+      ) : Nil
+        # Flush any pending non-textured geometry first
+        flush
+
+        # Enable texturing
+        LibGL.glActiveTexture(LibGL::GL_TEXTURE0)
+        LibGL.glBindTexture(LibGL::GL_TEXTURE_2D, texture_id)
+        LibGL.glUniform1i(@use_texture_loc, 1)
+
+        x1, y1 = x.to_f32, y.to_f32
+        x2, y2 = (x + w).to_f32, (y + h).to_f32
+
+        push_vertex_uv(x1, y1, r, g, b, a, 0_f32, 0_f32)
+        push_vertex_uv(x2, y1, r, g, b, a, 1_f32, 0_f32)
+        push_vertex_uv(x2, y2, r, g, b, a, 1_f32, 1_f32)
+        push_vertex_uv(x1, y1, r, g, b, a, 0_f32, 0_f32)
+        push_vertex_uv(x2, y2, r, g, b, a, 1_f32, 1_f32)
+        push_vertex_uv(x1, y2, r, g, b, a, 0_f32, 1_f32)
+
+        # Flush the textured quad
+        flush
+
+        # Disable texturing for subsequent non-textured geometry
+        LibGL.glUniform1i(@use_texture_loc, 0)
+      end
+
       private def push_vertex(x : Float32, y : Float32, r : Float64, g : Float64, b : Float64, a : Float64) : Nil
+        push_vertex_uv(x, y, r, g, b, a, 0_f32, 0_f32)
+      end
+
+      private def push_vertex_uv(x : Float32, y : Float32, r : Float64, g : Float64, b : Float64, a : Float64, u : Float32, v : Float32) : Nil
         if @vertex_count >= MAX_VERTICES
           flush
         end
@@ -213,8 +251,8 @@ module Sunflower
         @vertices << g.to_f32
         @vertices << b.to_f32
         @vertices << a.to_f32
-        @vertices << 0_f32 # u
-        @vertices << 0_f32 # v
+        @vertices << u
+        @vertices << v
         @vertex_count += 1
       end
 

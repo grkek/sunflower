@@ -9,7 +9,7 @@ require "http/client"
 require "medusa"
 require "gtk4"
 
-require "./sunflower/bindings/**"
+require "./ext/bindings/**"
 
 require "./sunflower/helpers/**"
 require "./sunflower/attributes/**"
