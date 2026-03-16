@@ -1,6 +1,6 @@
-(function() {
+(function () {
   // Virtual DOM node constructor
-  globalThis.h = function(type, props) {
+  globalThis.h = function (type, props) {
     var children = [];
     for (var i = 2; i < arguments.length; i++) {
       var child = arguments[i];
@@ -26,7 +26,7 @@
   var _hookIndex = 0;
   var _currentFiber = null;
 
-  globalThis.useState = function(initial) {
+  globalThis.useState = function (initial) {
     var fiber = _currentFiber;
     var index = _hookIndex++;
 
@@ -42,7 +42,7 @@
     var capturedIndex = index;
     var capturedFiberId = fiber.id;
 
-    var setter = function(value) {
+    var setter = function (value) {
       var old = _hookStates[capturedFiberId][capturedIndex];
       var next = typeof value === 'function' ? value(old) : value;
       if (old !== next) {
@@ -58,7 +58,7 @@
 
   var _effectStates = {};
 
-  globalThis.useEffect = function(callback, deps) {
+  globalThis.useEffect = function (callback, deps) {
     var fiber = _currentFiber;
     var index = _hookIndex++;
 
@@ -71,7 +71,7 @@
     var shouldRun = true;
 
     if (prev && deps !== undefined) {
-      shouldRun = !deps.every(function(dep, i) {
+      shouldRun = !deps.every(function (dep, i) {
         return dep === prev.deps[i];
       });
     }
@@ -82,7 +82,7 @@
       }
       var capturedFiberId = fiber.id;
       var capturedIndex = index;
-      _pendingEffects.push(function() {
+      _pendingEffects.push(function () {
         var cleanup = callback();
         _effectStates[capturedFiberId][capturedIndex] = {
           deps: deps,
@@ -114,7 +114,7 @@
 
     if (!_rerenderScheduled) {
       _rerenderScheduled = true;
-      Promise.resolve().then(function() {
+      Promise.resolve().then(function () {
         _rerenderScheduled = false;
         var queue = _rerenderQueue;
         _rerenderQueue = {};
@@ -415,7 +415,7 @@
     if (vnode._widgetId) {
       try {
         __destroy_widget(vnode._widgetId);
-      } catch(e) {}
+      } catch (e) { }
       vnode._widgetId = null;
     }
   }
@@ -429,7 +429,7 @@
   function _getTextContent(vnode) {
     if (!vnode || !vnode.children) return '';
     return vnode.children
-      .filter(function(c) { return typeof c === 'string' || typeof c === 'number'; })
+      .filter(function (c) { return typeof c === 'string' || typeof c === 'number'; })
       .join('');
   }
 
@@ -463,9 +463,21 @@
       var val = props[key];
       if (typeof val === 'function') continue;
 
-      switch(key) {
+      switch (key) {
         case 'className':
-          if (comp.addCssClass) comp.addCssClass(val);
+          if (comp.removeCssClass && comp.addCssClass) {
+            // Remove old classes first
+            var oldClasses = comp._currentClasses || [];
+            for (var ci = 0; ci < oldClasses.length; ci++) {
+              comp.removeCssClass(oldClasses[ci]);
+            }
+            // Add new classes
+            var newClasses = val ? val.split(' ').filter(function (c) { return c; }) : [];
+            for (var ci = 0; ci < newClasses.length; ci++) {
+              comp.addCssClass(newClasses[ci]);
+            }
+            comp._currentClasses = newClasses;
+          }
           break;
         case 'visible':
           if (comp.setVisible) comp.setVisible(val);
@@ -481,13 +493,23 @@
     for (var key in props) {
       if (typeof props[key] !== 'function') continue;
 
-      if (key === 'onPress') {
+      if (key === 'onPress' || key === 'onClick') {
         comp.on.press = props[key];
       } else if (key === 'onChange') {
         comp.on.change = props[key];
-      } else if (key === 'onClick') {
-        comp.on.press = props[key];
+      } else if (key === 'onRelease') {
+        comp.on.release = props[key];
+      } else if (key === 'onKeyPress') {
+        comp.on.keyPress = props[key];
+      } else if (key === 'onFocusChange') {
+        comp.on.focusChange = props[key];
       }
+    }
+
+    // Track CSS classes for reconciliation
+    if (props.className) {
+      var classes = props.className.split(' ').filter(function (c) { return c; });
+      comp._currentClasses = classes;
     }
   }
 
@@ -495,7 +517,7 @@
 
   var _rootVNodes = {};
 
-  $.render = function(containerId, component, props) {
+  $.render = function (containerId, component, props) {
     var vnode;
     if (typeof component === 'function') {
       vnode = h(component, props || {});
@@ -518,7 +540,7 @@
 
   // Fragment support
 
-  globalThis.Fragment = function(props) {
+  globalThis.Fragment = function (props) {
     return h("Box", { orientation: "vertical" }, props.children);
   };
 

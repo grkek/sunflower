@@ -698,6 +698,11 @@ module Sunflower
                      label = Gtk::Label.new(str: text)
                      wrap = (props["wrap"]?.try(&.as_bool?) || props["wrap"]?.try(&.as_s) == "true")
 
+                     label.wrap = wrap
+                     label.wrap_mode = Pango::WrapMode::WordChar
+                     label.hexpand = true
+                     label.max_width_chars = 1
+
                      label
                    when "Button"
                      text = props["text"]?.try(&.as_s) || ""
@@ -719,11 +724,16 @@ module Sunflower
                    when "ScrolledWindow"
                      sw = Gtk::ScrolledWindow.new
 
+                     sw.hscrollbar_policy = Gtk::PolicyType::Never
+                     sw.vscrollbar_policy = Gtk::PolicyType::Automatic
+
+                     sw.propagate_natural_width = false
+                     sw.propagate_natural_height = false
+
                      if (props["expand"]?.try(&.as_bool?) || props["expand"]?.try(&.as_s) == "true")
                        sw.vexpand = true
                        sw.hexpand = true
                      end
-
                      sw
                    when "HorizontalSeparator"
                      Gtk::Separator.new(orientation: Gtk::Orientation::Horizontal)
@@ -825,17 +835,12 @@ module Sunflower
           if component = Registry.instance.registered_components[widget_id]?
             widget = component.widget
 
-            if parent = widget.parent
-              case parent
-              when Gtk::Box
-                parent.remove(widget)
-              when Gtk::ScrolledWindow
-                parent.child = Pointer(Void).null.as(Gtk::Widget)
-              when Gtk::ListBox
-                parent.remove(widget)
-              else
-                Log.warn { "Seed: cannot remove from #{parent.class}" }
+            begin
+              if widget.parent
+                widget.unparent
               end
+            rescue
+              # Widget already destroyed by parent
             end
 
             Registry.instance.unregister(widget_id)
