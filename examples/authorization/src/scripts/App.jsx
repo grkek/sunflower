@@ -1,3 +1,5 @@
+import { post } from "http";
+
 function LoginPage({ onLogin, onNavigate }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -13,7 +15,7 @@ function LoginPage({ onLogin, onNavigate }) {
     setLoading(true);
     setError(null);
 
-    const res = await $.http.post("https://dummyjson.com/auth/login",
+    const res = await post("https://dummyjson.com/auth/login",
       JSON.stringify({
         username: username,
         password: password,
