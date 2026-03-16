@@ -271,7 +271,7 @@ module Sunflower
 
           parent_component = Registry.instance.registered_components[parent_id]?
           unless parent_component
-            Log.error { "Seed: parent #{parent_id} not found" }
+            Log.error { "Parent #{parent_id} not found" }
             next id
           end
 
@@ -338,7 +338,7 @@ module Sunflower
                    when "Canvas"
                      StandardLibrary::Canvas.create_widget(id, props)
                    else
-                     Log.warn { "Seed: unknown widget type '#{kind}', creating Box" }
+                     Log.warn { "Unknown widget type '#{kind}', creating Box" }
                      Gtk::Box.new(orientation: Gtk::Orientation::Vertical)
                    end
 
@@ -408,7 +408,7 @@ module Sunflower
           when Gtk::ListBox
             parent_widget.append(widget)
           else
-            Log.warn { "Seed: cannot append to #{parent_widget.class}" }
+            Log.warn { "Cannot append to #{parent_widget.class}" }
           end
 
           # Register as a component so JS can interact with it
@@ -421,7 +421,6 @@ module Sunflower
           )
           Registry.instance.register(component)
 
-          Log.debug { "Seed: created #{kind}##{id} in #{parent_id}" }
           id
         end
 
@@ -432,7 +431,7 @@ module Sunflower
             widget = component.widget
             widget.unparent if widget.parent
             Registry.instance.unregister(widget_id)
-            Log.debug { "Seed: destroyed #{widget_id}" }
+            Log.debug { "Destroyed #{widget_id}" }
           end
 
           nil
@@ -447,10 +446,10 @@ module Sunflower
         # Load the Seed runtime JS
         runtime_path = File.join(__DIR__, "..", "..", "runtime", "seed.js")
         if File.exists?(runtime_path)
-          Log.debug { "Seed: loading runtime from #{runtime_path}" }
+          Log.debug { "Loading runtime from #{runtime_path}" }
           @sandbox.eval_mutex!(File.read(runtime_path))
         else
-          Log.warn { "Seed: runtime not found at #{runtime_path}" }
+          Log.warn { "Runtime not found at #{runtime_path}" }
         end
       end
 

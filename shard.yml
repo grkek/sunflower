@@ -5,11 +5,14 @@ authors:
   - Giorgi Kavrelishvili <giorgi.kavrelishvili@pm.me>
 
 dependencies:
+  gtk4:
+    github: hugopl/gtk4.cr
+
   medusa:
     github: grkek/medusa
 
-  gtk4:
-    github: hugopl/gtk4.cr
+  petal:
+    github: grkek/petal
 
 development_dependencies:
   ameba:
