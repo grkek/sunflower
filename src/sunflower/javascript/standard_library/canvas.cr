@@ -1,28 +1,3 @@
-# 2D/3D game engine module using OpenGL via GTK4's GLArea.
-# All rendering is batched and GPU-accelerated.
-#
-# The STD lib module name stays as `Canvas`.
-# Internal rendering is delegated to Petal::Renderers and Petal::Renderer3D.
-#
-# JS API:
-#   import { Canvas, Canvas3D } from "canvas";
-#
-#   // 2D (unchanged)
-#   const canvas = new Canvas("game", { width: 800, height: 500, framesPerSecond: 60 });
-#
-#   canvas.onDraw((context) => { context.clear("#000"); context.fillRect(10, 10, 50, 50, "#f00"); });
-#   canvas.onUpdate((dt) => { if (canvas.isKeyDown("w")) { ... } });
-#   canvas.start();
-#
-#   // 3D
-#   const scene = new Canvas3D("scene", { width: 800, height: 600, framesPerSecond: 60 });
-#
-#   scene.setCamera({ position: [0,2,5], target: [0,0,0], fov: 60 });
-#   scene.addLight({ type: "directional", direction: [0,-1,-1], color: "#ffffff", intensity: 1.0 });
-#   const cube = scene.addMesh("cube", { size: 1 });
-#   scene.onUpdate((dt) => { scene.rotateMesh(cube, 0, dt, 0); });
-#   scene.start();
-
 module Sunflower
   module JavaScript
     module StandardLibrary
@@ -44,13 +19,19 @@ module Sunflower
           property mouse_y : Float64 = 0.0
           property mouse_down : Bool = false
 
-          # 2D rendering (Petal)
           property flat_renderer : Petal::Renderers::Flat::Renderer = Petal::Renderers::Flat::Renderer.new
           property text_renderer : Petal::Renderers::Flat::Text = Petal::Renderers::Flat::Text.new
 
-          # 3D rendering (Petal) — nil unless this is a Canvas3D instance
-          property dimensional_renderer : Petal::Renderers::Dimensional::Renderer? = nil
-          property mode : Symbol = :mode_2d # :mode_2d or :mode_3d
+          property scene_renderer : Petal::Renderers::Dimensional::SceneRenderer? = nil
+          property scene : Petal::Renderers::Dimensional::Scene? = nil
+          property camera : Petal::Renderers::Dimensional::Camera? = nil
+          property orbit_controls : Petal::Renderers::Dimensional::OrbitControls? = nil
+          property animation_mixer : Petal::Renderers::Dimensional::AnimationMixer? = nil
+          property clock : Petal::Renderers::Dimensional::Clock? = nil
+          property raycaster : Petal::Renderers::Dimensional::Raycaster? = nil
+          property texture_loader : Petal::Renderers::Dimensional::TextureLoader? = nil
+
+          property mode : Symbol = :mode_2d
 
           @@canvases = {} of String => State
 
@@ -61,25 +42,22 @@ module Sunflower
           def self.remove(id : String)
             if state = @@canvases.delete(id)
               state.flat_renderer.cleanup
-              state.dimensional_renderer.try(&.cleanup)
+              state.scene_renderer.try(&.cleanup)
+              state.texture_loader.try(&.cleanup)
             end
           end
         end
-
-        # Draw commands (2D)
 
         abstract struct DrawCommand; end
 
         struct ClearCommand < DrawCommand
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
-
           def initialize(@r, @g, @b, @a); end
         end
 
         struct FillRectCommand < DrawCommand
           getter x : Float64; getter y : Float64; getter w : Float64; getter h : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
-
           def initialize(@x, @y, @w, @h, @r, @g, @b, @a); end
         end
 
@@ -87,14 +65,12 @@ module Sunflower
           getter x : Float64; getter y : Float64; getter w : Float64; getter h : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
-
           def initialize(@x, @y, @w, @h, @r, @g, @b, @a, @line_width); end
         end
 
         struct FillCircleCommand < DrawCommand
           getter x : Float64; getter y : Float64; getter radius : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
-
           def initialize(@x, @y, @radius, @r, @g, @b, @a); end
         end
 
@@ -102,7 +78,6 @@ module Sunflower
           getter x : Float64; getter y : Float64; getter radius : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
-
           def initialize(@x, @y, @radius, @r, @g, @b, @a, @line_width); end
         end
 
@@ -110,7 +85,6 @@ module Sunflower
           getter x1 : Float64; getter y1 : Float64; getter x2 : Float64; getter y2 : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
-
           def initialize(@x1, @y1, @x2, @y2, @r, @g, @b, @a, @line_width); end
         end
 
@@ -118,7 +92,6 @@ module Sunflower
           getter text : String; getter x : Float64; getter y : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter size : Float64
-
           def initialize(@text, @x, @y, @r, @g, @b, @a, @size); end
         end
 
@@ -126,13 +99,17 @@ module Sunflower
           getter x1 : Float64; getter y1 : Float64; getter x2 : Float64; getter y2 : Float64
           getter x3 : Float64; getter y3 : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
-
           def initialize(@x1, @y1, @x2, @y2, @x3, @y3, @r, @g, @b, @a); end
         end
 
         def register(sandbox : Medusa::Sandbox, engine : Engine) : Nil
           register_draw_bindings(sandbox, engine)
           register_3d_bindings(sandbox, engine)
+          register_3d_material_bindings(sandbox, engine)
+          register_3d_group_bindings(sandbox, engine)
+          register_3d_scene_bindings(sandbox, engine)
+          register_3d_interaction_bindings(sandbox, engine)
+          register_3d_loader_bindings(sandbox, engine)
           register_control_bindings(sandbox, engine)
           install_js_module(sandbox)
         end
@@ -141,8 +118,6 @@ module Sunflower
           c = Petal::Math::Color.from_hex(hex)
           {c.r, c.g, c.b, c.a}
         end
-
-        # 2D draw bindings (unchanged API)
 
         private def register_draw_bindings(sandbox, engine) : Nil
           sandbox.bind("__canvas_clear", 2) do |args|
@@ -155,64 +130,49 @@ module Sunflower
           sandbox.bind("__canvas_fillRect", 6) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[5].as_s)
-            State.get(id).draw_commands << FillRectCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a
-            )
+            State.get(id).draw_commands << FillRectCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a)
             nil
           end
 
           sandbox.bind("__canvas_strokeRect", 7) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[5].as_s)
-            State.get(id).draw_commands << StrokeRectCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a, args[6].as_f64
-            )
+            State.get(id).draw_commands << StrokeRectCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a, args[6].as_f64)
             nil
           end
 
           sandbox.bind("__canvas_fillCircle", 5) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[4].as_s)
-            State.get(id).draw_commands << FillCircleCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, r, g, b, a
-            )
+            State.get(id).draw_commands << FillCircleCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, r, g, b, a)
             nil
           end
 
           sandbox.bind("__canvas_strokeCircle", 6) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[4].as_s)
-            State.get(id).draw_commands << StrokeCircleCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, r, g, b, a, args[5].as_f64
-            )
+            State.get(id).draw_commands << StrokeCircleCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, r, g, b, a, args[5].as_f64)
             nil
           end
 
           sandbox.bind("__canvas_drawLine", 7) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[5].as_s)
-            State.get(id).draw_commands << DrawLineCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a, args[6].as_f64
-            )
+            State.get(id).draw_commands << DrawLineCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, r, g, b, a, args[6].as_f64)
             nil
           end
 
           sandbox.bind("__canvas_fillText", 6) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[4].as_s)
-            State.get(id).draw_commands << FillTextCommand.new(
-              args[1].as_s, args[2].as_f64, args[3].as_f64, r, g, b, a, args[5].as_f64
-            )
+            State.get(id).draw_commands << FillTextCommand.new(args[1].as_s, args[2].as_f64, args[3].as_f64, r, g, b, a, args[5].as_f64)
             nil
           end
 
           sandbox.bind("__canvas_fillTriangle", 8) do |args|
             id = args[0].as_s
             r, g, b, a = Canvas.parse_hex(args[7].as_s)
-            State.get(id).draw_commands << FillTriangleCommand.new(
-              args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64,
-              args[5].as_f64, args[6].as_f64, r, g, b, a
-            )
+            State.get(id).draw_commands << FillTriangleCommand.new(args[1].as_f64, args[2].as_f64, args[3].as_f64, args[4].as_f64, args[5].as_f64, args[6].as_f64, r, g, b, a)
             nil
           end
 
@@ -220,17 +180,9 @@ module Sunflower
             State.get(args[0].as_s).keys_held.includes?(args[1].as_s)
           end
 
-          sandbox.bind("__canvas_getMouseX", 1) do |args|
-            State.get(args[0].as_s).mouse_x
-          end
-
-          sandbox.bind("__canvas_getMouseY", 1) do |args|
-            State.get(args[0].as_s).mouse_y
-          end
-
-          sandbox.bind("__canvas_isMouseDown", 1) do |args|
-            State.get(args[0].as_s).mouse_down
-          end
+          sandbox.bind("__canvas_getMouseX", 1) { |args| State.get(args[0].as_s).mouse_x }
+          sandbox.bind("__canvas_getMouseY", 1) { |args| State.get(args[0].as_s).mouse_y }
+          sandbox.bind("__canvas_isMouseDown", 1) { |args| State.get(args[0].as_s).mouse_down }
 
           sandbox.bind("__canvas_getWidth", 1) do |args|
             id = args[0].as_s
@@ -251,19 +203,24 @@ module Sunflower
           end
         end
 
-        # 3D bindings
-
         private def register_3d_bindings(sandbox, engine) : Nil
           sandbox.bind("__canvas3d_init", 1) do |args|
             id = args[0].as_s
             state = State.get(id)
             state.mode = :mode_3d
-            state.dimensional_renderer = Petal::Renderers::Dimensional::Renderer.new
+
+            state.scene = Petal::Renderers::Dimensional::Scene.new
+            state.camera = Petal::Renderers::Dimensional::Camera.new
+            state.scene_renderer = Petal::Renderers::Dimensional::SceneRenderer.new
+            state.animation_mixer = Petal::Renderers::Dimensional::AnimationMixer.new
+            state.clock = Petal::Renderers::Dimensional::Clock.new
+            state.raycaster = Petal::Renderers::Dimensional::Raycaster.new
+            state.texture_loader = Petal::Renderers::Dimensional::TextureLoader.new
 
             if c = Registry.instance.registered_components[id]?
               gl_area = c.widget.as(Gtk::GLArea)
               gl_area.make_current
-              state.dimensional_renderer.try(&.initialize_gl)
+              state.scene_renderer.try(&.initialize_gl)
             end
 
             nil
@@ -271,225 +228,644 @@ module Sunflower
 
           sandbox.bind("__canvas3d_setCamera", 10) do |args|
             id = args[0].as_s
-            state = State.get(id)
-            if r3d = state.dimensional_renderer
-              r3d.camera.position = Petal::Math::Vector3.new(args[1].as_f64, args[2].as_f64, args[3].as_f64)
-              r3d.camera.target = Petal::Math::Vector3.new(args[4].as_f64, args[5].as_f64, args[6].as_f64)
-              r3d.camera.fov = Petal::Math.deg_to_rad(args[7].as_f64)
-              r3d.camera.near = args[8].as_f64
-              r3d.camera.far = args[9].as_f64
+            if cam = State.get(id).camera
+              cam.position = Petal::Math::Vector3.new(args[1].as_f64, args[2].as_f64, args[3].as_f64)
+              cam.target = Petal::Math::Vector3.new(args[4].as_f64, args[5].as_f64, args[6].as_f64)
+              cam.fov = Petal::Math.deg_to_rad(args[7].as_f64)
+              cam.near = args[8].as_f64
+              cam.far = args[9].as_f64
             end
             nil
           end
 
           sandbox.bind("__canvas3d_setCameraOrthographic", 3) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              r3d.camera.orthographic = args[1].as_s == "true"
-              r3d.camera.ortho_size = args[2].as_f64
+            if cam = State.get(id).camera
+              cam.orthographic = args[1].as_s == "true"
+              cam.ortho_size = args[2].as_f64
             end
             nil
           end
 
           sandbox.bind("__canvas3d_orbitCamera", 3) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              r3d.camera.orbit(args[1].as_f64, args[2].as_f64)
+            if cam = State.get(id).camera
+              cam.orbit(args[1].as_f64, args[2].as_f64)
             end
             nil
           end
 
           sandbox.bind("__canvas3d_zoomCamera", 2) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              r3d.camera.zoom(args[1].as_f64)
+            if cam = State.get(id).camera
+              cam.zoom(args[1].as_f64)
             end
             nil
           end
 
-          # addLight(id, type, posX, posY, posZ, dirX, dirY, dirZ, colorHex, intensity)
+          sandbox.bind("__canvas3d_enableOrbitControls", 1) do |args|
+            id = args[0].as_s
+            state = State.get(id)
+            if cam = state.camera
+              state.orbit_controls = Petal::Renderers::Dimensional::OrbitControls.new(cam)
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_setOrbitTarget", 4) do |args|
+            id = args[0].as_s
+            if oc = State.get(id).orbit_controls
+              oc.target = Petal::Math::Vector3.new(args[1].as_f64, args[2].as_f64, args[3].as_f64)
+            end
+            nil
+          end
+
           sandbox.bind("__canvas3d_addLight", 10) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
+            if scene = State.get(id).scene
               type_str = args[1].as_s
               pos = Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64)
               dir = Petal::Math::Vector3.new(args[5].as_f64, args[6].as_f64, args[7].as_f64)
               color = Petal::Math::Color.from_hex(args[8].as_s)
               intensity = args[9].as_f64
 
-              light = case type_str
-                      when "point"
-                        Petal::Renderers::Dimensional::Light.point(pos, color, intensity)
-                      when "spot"
-                        Petal::Renderers::Dimensional::Light.spot(pos, dir, color, intensity)
-                      else
-                        Petal::Renderers::Dimensional::Light.directional(dir, color, intensity)
-                      end
-              r3d.add_light(light)
+              light_obj = case type_str
+                          when "point"
+                            obj = Petal::Renderers::Dimensional::PointLightObject.new(color: color, intensity: intensity)
+                            obj.position = pos
+                            obj
+                          when "spot"
+                            obj = Petal::Renderers::Dimensional::SpotLightObject.new(color: color, intensity: intensity, target_position: pos + dir)
+                            obj.position = pos
+                            obj
+                          when "hemisphere"
+                            Petal::Renderers::Dimensional::HemisphereLightObject.new(sky_color: color, intensity: intensity)
+                          else
+                            obj = Petal::Renderers::Dimensional::DirectionalLightObject.new(color: color, intensity: intensity, direction: dir)
+                            obj
+                          end
+
+              scene.add(light_obj)
             end
             nil
           end
 
           sandbox.bind("__canvas3d_setAmbient", 2) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              r3d.ambient_light = Petal::Math::Color.from_hex(args[1].as_s)
+            state = State.get(id)
+            if scene = state.scene
+              scene.ambient_light_color = Petal::Math::Color.from_hex(args[1].as_s)
             end
             nil
           end
 
-          # addMesh(id, meshName, type, jsonParams) → returns mesh name
+          sandbox.bind("__canvas3d_addAmbientLight", 3) do |args|
+            id = args[0].as_s
+            if scene = State.get(id).scene
+              color = Petal::Math::Color.from_hex(args[1].as_s)
+              intensity = args[2].as_f64
+              scene.add(Petal::Renderers::Dimensional::AmbientLightObject.new(color: color, intensity: intensity))
+            end
+            nil
+          end
+
           sandbox.bind("__canvas3d_addMesh", 4) do |args|
             id = args[0].as_s
             mesh_name = args[1].as_s
             mesh_type = args[2].as_s
             params = JSON.parse(args[3].as_s)
 
-            if r3d = State.get(id).dimensional_renderer
+            if scene = State.get(id).scene
               color_hex = params["color"]?.try(&.as_s?) || "#ffffff"
               color = Petal::Math::Color.from_hex(color_hex)
 
-              mesh = case mesh_type
-                     when "cube"
-                       Petal::Renderers::Dimensional::Mesh.cube(size: params["size"]?.try(&.as_f?) || 1.0, color: color)
-                     when "sphere"
-                       Petal::Renderers::Dimensional::Mesh.sphere(
-                         radius: params["radius"]?.try(&.as_f?) || 1.0,
-                         rings: (params["rings"]?.try(&.as_i?) || 16),
-                         sectors: (params["sectors"]?.try(&.as_i?) || 32),
-                         color: color
-                       )
-                     when "plane"
-                       Petal::Renderers::Dimensional::Mesh.plane(
-                         width: params["width"]?.try(&.as_f?) || 10.0,
-                         depth: params["depth"]?.try(&.as_f?) || 10.0,
-                         color: color
-                       )
-                     when "cylinder"
-                       Petal::Renderers::Dimensional::Mesh.cylinder(
-                         radius: params["radius"]?.try(&.as_f?) || 0.5,
-                         height: params["height"]?.try(&.as_f?) || 1.0,
-                         color: color
-                       )
-                     when "cone"
-                       Petal::Renderers::Dimensional::Mesh.cone(
-                         radius: params["radius"]?.try(&.as_f?) || 0.5,
-                         height: params["height"]?.try(&.as_f?) || 1.0,
-                         color: color
-                       )
-                     else
-                       Petal::Renderers::Dimensional::Mesh.cube(color: color)
-                     end
+              geometry = Canvas.build_geometry(mesh_type, params)
+              material = Canvas.build_material(params, color)
 
-              node = Petal::Renderers::Dimensional::SceneNode.new(name: mesh_name, mesh: mesh)
+              mesh3d = Petal::Renderers::Dimensional::Mesh3D.new(geometry: geometry, material_base: material, name: mesh_name)
 
               if pos = params["position"]?.try(&.as_a?)
-                node.transform.position = Petal::Math::Vector3.new(
-                  pos[0]?.try(&.as_f?) || 0.0,
-                  pos[1]?.try(&.as_f?) || 0.0,
-                  pos[2]?.try(&.as_f?) || 0.0
+                mesh3d.position = Petal::Math::Vector3.new(
+                  pos[0]?.try(&.as_f?) || 0.0, pos[1]?.try(&.as_f?) || 0.0, pos[2]?.try(&.as_f?) || 0.0
                 )
               end
 
               if scale = params["scale"]?.try(&.as_a?)
-                node.transform.scale = Petal::Math::Vector3.new(
-                  scale[0]?.try(&.as_f?) || 1.0,
-                  scale[1]?.try(&.as_f?) || 1.0,
-                  scale[2]?.try(&.as_f?) || 1.0
+                mesh3d.scale = Petal::Math::Vector3.new(
+                  scale[0]?.try(&.as_f?) || 1.0, scale[1]?.try(&.as_f?) || 1.0, scale[2]?.try(&.as_f?) || 1.0
                 )
               end
 
-              # Material
-              if mat_data = params["material"]?
-                mat = Petal::Renderers::Dimensional::Material.new
-                if amb = mat_data["ambient"]?.try(&.as_s?)
-                  c = Petal::Math::Color.from_hex(amb)
-                  mat.ambient = c
-                end
-                if diff = mat_data["diffuse"]?.try(&.as_s?)
-                  c = Petal::Math::Color.from_hex(diff)
-                  mat.diffuse = c
-                end
-                if spec = mat_data["specular"]?.try(&.as_s?)
-                  c = Petal::Math::Color.from_hex(spec)
-                  mat.specular = c
-                end
-                if shin = mat_data["shininess"]?.try(&.as_f?)
-                  mat.shininess = shin
-                end
-                node.material = mat
+              parent_name = params["parent"]?.try(&.as_s?)
+              if parent_name && (parent_obj = scene.find_by_name(parent_name))
+                parent_obj.add(mesh3d)
+              else
+                scene.add(mesh3d)
               end
-
-              r3d.root.add_child(node)
             end
 
             mesh_name
           end
 
-          # setMeshPosition(id, meshName, x, y, z)
           sandbox.bind("__canvas3d_setMeshPosition", 5) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              if node = r3d.root.find(args[1].as_s)
-                node.transform.position = Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64)
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
+                node.position = Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64)
               end
             end
             nil
           end
 
-          # rotateMesh(id, meshName, pitch, yaw, roll)
           sandbox.bind("__canvas3d_rotateMesh", 5) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              if node = r3d.root.find(args[1].as_s)
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
                 node.transform.rotate_euler(args[2].as_f64, args[3].as_f64, args[4].as_f64)
               end
             end
             nil
           end
 
-          # setMeshScale(id, meshName, sx, sy, sz)
           sandbox.bind("__canvas3d_setMeshScale", 5) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              if node = r3d.root.find(args[1].as_s)
-                node.transform.scale = Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64)
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
+                node.scale = Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64)
               end
             end
             nil
           end
 
-          # setMeshVisible(id, meshName, visible)
           sandbox.bind("__canvas3d_setMeshVisible", 3) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              if node = r3d.root.find(args[1].as_s)
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
                 node.visible = args[2].as_s == "true"
               end
             end
             nil
           end
 
-          # removeMesh(id, meshName)
           sandbox.bind("__canvas3d_removeMesh", 2) do |args|
             id = args[0].as_s
-            if r3d = State.get(id).dimensional_renderer
-              if node = r3d.root.find(args[1].as_s)
-                r3d.root.remove_child(node)
-                node.mesh.try(&.cleanup)
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
+                node.remove_from_parent
+                if node.is_a?(Petal::Renderers::Dimensional::Mesh3D)
+                  node.cleanup
+                end
               end
             end
             nil
           end
 
-          # clear3D(id, colorHex)
+          sandbox.bind("__canvas3d_lookAt", 5) do |args|
+            id = args[0].as_s
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(args[1].as_s)
+                node.look_at(Petal::Math::Vector3.new(args[2].as_f64, args[3].as_f64, args[4].as_f64))
+              end
+            end
+            nil
+          end
+
           sandbox.bind("__canvas3d_clear", 2) do |args|
-            State.get(args[0].as_s).clear_color = Petal::Math::Color.from_hex(args[1].as_s)
+            state = State.get(args[0].as_s)
+            if scene = state.scene
+              scene.background = Petal::Math::Color.from_hex(args[1].as_s)
+            end
+            state.clear_color = Petal::Math::Color.from_hex(args[1].as_s)
+            nil
+          end
+
+          sandbox.bind("__canvas3d_getStats", 1) do |args|
+            id = args[0].as_s
+            if sr = State.get(id).scene_renderer
+              stats = sr.stats
+              "{\"drawCalls\":#{stats.draw_calls},\"triangles\":#{stats.triangles},\"rendered\":#{stats.objects_rendered},\"culled\":#{stats.objects_culled},\"frameMs\":#{stats.frame_time_ms.round(2)}}"
+            else
+              "{}"
+            end
+          end
+        end
+
+        private def register_3d_material_bindings(sandbox, engine) : Nil
+          sandbox.bind("__canvas3d_setMeshMaterial", 3) do |args|
+            id = args[0].as_s
+            mesh_name = args[1].as_s
+            mat_json = JSON.parse(args[2].as_s)
+
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(mesh_name)
+                if node.is_a?(Petal::Renderers::Dimensional::Mesh3D)
+                  color_hex = mat_json["color"]?.try(&.as_s?) || "#cccccc"
+                  color = Petal::Math::Color.from_hex(color_hex)
+                  node.material_base = Canvas.build_material(mat_json, color)
+                end
+              end
+            end
             nil
           end
         end
 
-        # Control bindings (start/stop)
+        private def register_3d_group_bindings(sandbox, engine) : Nil
+          sandbox.bind("__canvas3d_addGroup", 2) do |args|
+            id = args[0].as_s
+            group_name = args[1].as_s
+            if scene = State.get(id).scene
+              group = Petal::Renderers::Dimensional::Group.new(name: group_name)
+              scene.add(group)
+            end
+            group_name
+          end
+
+          sandbox.bind("__canvas3d_reparent", 3) do |args|
+            id = args[0].as_s
+            child_name = args[1].as_s
+            parent_name = args[2].as_s
+            if scene = State.get(id).scene
+              child = scene.find_by_name(child_name)
+              parent = scene.find_by_name(parent_name)
+              if child && parent
+                parent.attach(child)
+              end
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_addGridHelper", 3) do |args|
+            id = args[0].as_s
+            size = args[1].as_f64
+            divisions = args[2].as_f64.to_i32
+            if scene = State.get(id).scene
+              grid = Petal::Renderers::Dimensional::GridHelper.new(size: size, divisions: divisions)
+              scene.add(grid)
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_addAxesHelper", 2) do |args|
+            id = args[0].as_s
+            length = args[1].as_f64
+            if scene = State.get(id).scene
+              axes = Petal::Renderers::Dimensional::AxesHelper.new(length: length)
+              scene.add(axes)
+            end
+            nil
+          end
+        end
+
+        private def register_3d_scene_bindings(sandbox, engine) : Nil
+          sandbox.bind("__canvas3d_setFog", 5) do |args|
+            id = args[0].as_s
+            if scene = State.get(id).scene
+              fog_type = args[1].as_s
+              color = Petal::Math::Color.from_hex(args[2].as_s)
+              if fog_type == "exp2"
+                scene.fog = Petal::Renderers::Dimensional::FogParams.exp2(color, args[3].as_f64)
+              else
+                scene.fog = Petal::Renderers::Dimensional::FogParams.linear(color, args[3].as_f64, args[4].as_f64)
+              end
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_clearFog", 1) do |args|
+            if scene = State.get(args[0].as_s).scene
+              scene.fog = nil
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_setFrustumCulling", 2) do |args|
+            if sr = State.get(args[0].as_s).scene_renderer
+              sr.enable_frustum_culling = args[1].as_s == "true"
+            end
+            nil
+          end
+        end
+
+        private def register_3d_interaction_bindings(sandbox, engine) : Nil
+          sandbox.bind("__canvas3d_raycast", 3) do |args|
+            id = args[0].as_s
+            state = State.get(id)
+            screen_x = args[1].as_f64
+            screen_y = args[2].as_f64
+
+            result = "[]"
+            if (rc = state.raycaster) && (cam = state.camera) && (scene = state.scene)
+              w = state.width
+              h = state.height
+              ndc_x, ndc_y = Petal::Renderers::Dimensional::Raycaster.screen_to_ndc(screen_x, screen_y, w, h)
+              aspect = w.to_f64 / h.to_f64
+              rc.set_from_camera(ndc_x, ndc_y, cam, aspect)
+              hits = rc.intersect_objects(scene)
+              parts = hits.first(10).map do |hit|
+                "{\"name\":\"#{hit.object.name}\",\"distance\":#{hit.distance.round(4)},\"point\":[#{hit.point.x.round(4)},#{hit.point.y.round(4)},#{hit.point.z.round(4)}]}"
+              end
+              result = "[#{parts.join(",")}]"
+            end
+            result
+          end
+
+          sandbox.bind("__canvas3d_orbitMouseMove", 4) do |args|
+            id = args[0].as_s
+            if oc = State.get(id).orbit_controls
+              oc.on_mouse_move(args[1].as_f64, args[2].as_f64, args[3].as_f64.to_i32)
+            end
+            nil
+          end
+
+          sandbox.bind("__canvas3d_orbitScroll", 2) do |args|
+            if oc = State.get(args[0].as_s).orbit_controls
+              oc.on_scroll(args[1].as_f64)
+            end
+            nil
+          end
+        end
+
+        private def register_3d_loader_bindings(sandbox, engine) : Nil
+          sandbox.bind("__canvas3d_loadOBJ", 4) do |args|
+            id = args[0].as_s
+            obj_name = args[1].as_s
+            path = args[2].as_s
+            mat_json = JSON.parse(args[3].as_s)
+
+            state = State.get(id)
+            scene = state.scene
+
+            if scene
+              loader = Petal::Renderers::Dimensional::OBJLoader.new
+
+              color_hex = mat_json["color"]?.try(&.as_s?) || "#cccccc"
+              color = Petal::Math::Color.from_hex(color_hex)
+              material = Canvas.build_material(mat_json, color)
+
+              group = loader.load_as_mesh(path, material)
+              group.name = obj_name
+
+              if pos = mat_json["position"]?.try(&.as_a?)
+                group.position = Petal::Math::Vector3.new(
+                  pos[0]?.try(&.as_f?) || 0.0, pos[1]?.try(&.as_f?) || 0.0, pos[2]?.try(&.as_f?) || 0.0
+                )
+              end
+
+              if scale = mat_json["scale"]?.try(&.as_a?)
+                group.scale = Petal::Math::Vector3.new(
+                  scale[0]?.try(&.as_f?) || 1.0, scale[1]?.try(&.as_f?) || 1.0, scale[2]?.try(&.as_f?) || 1.0
+                )
+              end
+
+              parent_name = mat_json["parent"]?.try(&.as_s?)
+              if parent_name && (parent_obj = scene.find_by_name(parent_name))
+                parent_obj.add(group)
+              else
+                scene.add(group)
+              end
+            end
+
+            obj_name
+          end
+
+          sandbox.bind("__canvas3d_loadOBJString", 4) do |args|
+            id = args[0].as_s
+            obj_name = args[1].as_s
+            obj_source = args[2].as_s
+            mat_json = JSON.parse(args[3].as_s)
+
+            state = State.get(id)
+            scene = state.scene
+
+            if scene
+              loader = Petal::Renderers::Dimensional::OBJLoader.new
+              models = loader.parse(obj_source)
+
+              color_hex = mat_json["color"]?.try(&.as_s?) || "#cccccc"
+              color = Petal::Math::Color.from_hex(color_hex)
+              material = Canvas.build_material(mat_json, color)
+
+              group = Petal::Renderers::Dimensional::Group.new(name: obj_name)
+              models.each do |model|
+                mesh = Petal::Renderers::Dimensional::Mesh3D.new(
+                  geometry: model.geometry, material_base: material, name: model.name
+                )
+                group.add(mesh)
+              end
+
+              if pos = mat_json["position"]?.try(&.as_a?)
+                group.position = Petal::Math::Vector3.new(
+                  pos[0]?.try(&.as_f?) || 0.0, pos[1]?.try(&.as_f?) || 0.0, pos[2]?.try(&.as_f?) || 0.0
+                )
+              end
+
+              if scale = mat_json["scale"]?.try(&.as_a?)
+                group.scale = Petal::Math::Vector3.new(
+                  scale[0]?.try(&.as_f?) || 1.0, scale[1]?.try(&.as_f?) || 1.0, scale[2]?.try(&.as_f?) || 1.0
+                )
+              end
+
+              parent_name = mat_json["parent"]?.try(&.as_s?)
+              if parent_name && (parent_obj = scene.find_by_name(parent_name))
+                parent_obj.add(group)
+              else
+                scene.add(group)
+              end
+            end
+
+            obj_name
+          end
+
+          sandbox.bind("__canvas3d_getObjectChildren", 2) do |args|
+            id = args[0].as_s
+            obj_name = args[1].as_s
+            result = "[]"
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(obj_name)
+                names = node.children.map { |c| "\"#{c.name}\"" }
+                result = "[#{names.join(",")}]"
+              end
+            end
+            result
+          end
+
+          sandbox.bind("__canvas3d_getObjectPosition", 2) do |args|
+            id = args[0].as_s
+            obj_name = args[1].as_s
+            result = "[0,0,0]"
+            if scene = State.get(id).scene
+              if node = scene.find_by_name(obj_name)
+                p = node.world_position
+                result = "[#{p.x},#{p.y},#{p.z}]"
+              end
+            end
+            result
+          end
+
+          sandbox.bind("__canvas3d_cloneObject", 3) do |args|
+            id = args[0].as_s
+            source_name = args[1].as_s
+            clone_name = args[2].as_s
+
+            if scene = State.get(id).scene
+              if source = scene.find_by_name(source_name)
+                cloned = Canvas.clone_subtree(source, clone_name)
+                scene.add(cloned)
+              end
+            end
+
+            clone_name
+          end
+        end
+
+        protected def self.clone_subtree(source : Petal::Renderers::Dimensional::Object3D, new_name : String) : Petal::Renderers::Dimensional::Object3D
+          if source.is_a?(Petal::Renderers::Dimensional::Mesh3D)
+            cloned = Petal::Renderers::Dimensional::Mesh3D.new(
+              geometry: source.geometry,
+              material_base: source.material_base,
+              name: new_name,
+            )
+            cloned.position = source.position
+            cloned.rotation = source.rotation
+            cloned.scale = source.scale
+            cloned.visible = source.visible
+            source.children.each_with_index do |child, i|
+              cloned.add(clone_subtree(child, "#{new_name}_child_#{i}"))
+            end
+            cloned
+          else
+            group = Petal::Renderers::Dimensional::Group.new(name: new_name)
+            group.position = source.position
+            group.rotation = source.rotation
+            group.scale = source.scale
+            group.visible = source.visible
+            source.children.each_with_index do |child, i|
+              group.add(clone_subtree(child, "#{new_name}_child_#{i}"))
+            end
+            group
+          end
+        end
+
+        protected def self.build_geometry(mesh_type : String, params : JSON::Any) : Petal::Renderers::Dimensional::Geometry
+          case mesh_type
+          when "cube", "box"
+            Petal::Renderers::Dimensional::BoxGeometry.new(
+              width: params["width"]?.try(&.as_f?) || params["size"]?.try(&.as_f?) || 1.0,
+              height: params["height"]?.try(&.as_f?) || params["size"]?.try(&.as_f?) || 1.0,
+              depth: params["depth"]?.try(&.as_f?) || params["size"]?.try(&.as_f?) || 1.0,
+            )
+          when "sphere"
+            Petal::Renderers::Dimensional::SphereGeometry.new(
+              radius: params["radius"]?.try(&.as_f?) || 1.0,
+              width_segments: (params["widthSegments"]?.try(&.as_i?) || params["sectors"]?.try(&.as_i?) || 32),
+              height_segments: (params["heightSegments"]?.try(&.as_i?) || params["rings"]?.try(&.as_i?) || 16),
+            )
+          when "plane"
+            Petal::Renderers::Dimensional::PlaneGeometry.new(
+              width: params["width"]?.try(&.as_f?) || 10.0,
+              height: params["depth"]?.try(&.as_f?) || params["height"]?.try(&.as_f?) || 10.0,
+            )
+          when "cylinder"
+            Petal::Renderers::Dimensional::CylinderGeometry.new(
+              radius_top: params["radiusTop"]?.try(&.as_f?) || params["radius"]?.try(&.as_f?) || 0.5,
+              radius_bottom: params["radiusBottom"]?.try(&.as_f?) || params["radius"]?.try(&.as_f?) || 0.5,
+              height: params["height"]?.try(&.as_f?) || 1.0,
+              radial_segments: params["segments"]?.try(&.as_i?) || 32,
+            )
+          when "cone"
+            Petal::Renderers::Dimensional::ConeGeometry.new(
+              radius: params["radius"]?.try(&.as_f?) || 0.5,
+              height: params["height"]?.try(&.as_f?) || 1.0,
+            )
+          when "torus"
+            Petal::Renderers::Dimensional::TorusGeometry.new(
+              radius: params["radius"]?.try(&.as_f?) || 1.0,
+              tube: params["tube"]?.try(&.as_f?) || 0.4,
+            )
+          when "torusKnot"
+            Petal::Renderers::Dimensional::TorusKnotGeometry.new(
+              radius: params["radius"]?.try(&.as_f?) || 1.0,
+              tube: params["tube"]?.try(&.as_f?) || 0.4,
+            )
+          when "ring"
+            Petal::Renderers::Dimensional::RingGeometry.new(
+              inner_radius: params["innerRadius"]?.try(&.as_f?) || 0.5,
+              outer_radius: params["outerRadius"]?.try(&.as_f?) || 1.0,
+            )
+          when "icosahedron"
+            Petal::Renderers::Dimensional::IcosahedronGeometry.new(
+              radius: params["radius"]?.try(&.as_f?) || 1.0,
+              detail: params["detail"]?.try(&.as_i?) || 0,
+            )
+          else
+            Petal::Renderers::Dimensional::BoxGeometry.new
+          end
+        end
+
+        protected def self.build_material(params : JSON::Any, color : Petal::Math::Color) : Petal::Renderers::Dimensional::MaterialBase
+          mat_data = params["material"]?
+          mat_type = mat_data.try(&.["type"]?.try(&.as_s?)) || params["materialType"]?.try(&.as_s?) || "phong"
+          transparent = mat_data.try(&.["transparent"]?.try(&.as_bool?)) || false
+          opacity = mat_data.try(&.["opacity"]?.try(&.as_f?)) || 1.0
+          side_str = mat_data.try(&.["side"]?.try(&.as_s?)) || "front"
+          wireframe = mat_data.try(&.["wireframe"]?.try(&.as_bool?)) || false
+
+          side = case side_str
+                 when "back"   then Petal::Renderers::Dimensional::Side::Back
+                 when "double" then Petal::Renderers::Dimensional::Side::Double
+                 else               Petal::Renderers::Dimensional::Side::Front
+                 end
+
+          mat_color = color
+          if c = mat_data.try(&.["color"]?.try(&.as_s?))
+            mat_color = Petal::Math::Color.from_hex(c)
+          end
+
+          material : Petal::Renderers::Dimensional::MaterialBase = case mat_type
+          when "basic"
+            Petal::Renderers::Dimensional::MeshBasicMaterial.new(
+              color: mat_color,
+              transparent: transparent,
+              opacity: opacity,
+              side: side,
+              wireframe: wireframe,
+            )
+          when "lambert"
+            ambient = mat_data.try(&.["ambient"]?.try(&.as_s?))
+            Petal::Renderers::Dimensional::MeshLambertMaterial.new(
+              color: mat_color,
+              ambient: ambient ? Petal::Math::Color.from_hex(ambient) : Petal::Math::Color.new(0.2, 0.2, 0.2),
+              transparent: transparent,
+              opacity: opacity,
+              side: side,
+              wireframe: wireframe,
+            )
+          when "normal"
+            Petal::Renderers::Dimensional::MeshNormalMaterial.new(
+              transparent: transparent,
+              opacity: opacity,
+              side: side,
+              wireframe: wireframe,
+            )
+          else
+            ambient = mat_data.try(&.["ambient"]?.try(&.as_s?))
+            specular = mat_data.try(&.["specular"]?.try(&.as_s?))
+            shininess = mat_data.try(&.["shininess"]?.try(&.as_f?)) || 32.0
+            Petal::Renderers::Dimensional::MeshPhongMaterial.new(
+              color: mat_color,
+              ambient: ambient ? Petal::Math::Color.from_hex(ambient) : Petal::Math::Color.new(0.2, 0.2, 0.2),
+              specular: specular ? Petal::Math::Color.from_hex(specular) : Petal::Math::Color.new(1.0, 1.0, 1.0),
+              shininess: shininess,
+              transparent: transparent,
+              opacity: opacity,
+              side: side,
+              wireframe: wireframe,
+            )
+          end
+
+          material
+        end
+
         private def register_control_bindings(sandbox, engine) : Nil
           sandbox.bind("__canvas_start", 1) do |args|
             @@active_canvas_id = args[0].as_s
@@ -505,6 +881,13 @@ module Sunflower
 
                 cs = State.get(id)
                 return 0 unless cs.running
+
+                if oc = cs.orbit_controls
+                  dt = cs.clock.try(&.delta) || (@@active_interval / 1000.0)
+                  oc.update(dt)
+                end
+
+                cs.animation_mixer.try(&.update(cs.clock.try(&.delta) || (@@active_interval / 1000.0)))
 
                 begin
                   Engine.instance.sandbox.eval_mutex!(
@@ -542,7 +925,6 @@ module Sunflower
           end
         end
 
-        # JS module installation
         private def install_js_module(sandbox) : Nil
           sandbox.eval_mutex!(<<-JS)
             globalThis.__canvasCallbacks = {};
@@ -550,9 +932,6 @@ module Sunflower
           JS
 
           ModuleLoader.register("canvas", <<-JS)
-            // ═══════════════════════════════════════════════════
-            //  Canvas (2D) — unchanged public API
-            // ═══════════════════════════════════════════════════
             class Canvas {
               constructor(id, opts) {
                 opts = opts || {};
@@ -587,7 +966,6 @@ module Sunflower
               mouseX()        { return __canvas_getMouseX(this.id); }
               mouseY()        { return __canvas_getMouseY(this.id); }
               isMouseDown()   { return __canvas_isMouseDown(this.id); }
-
               getWidth()      { return __canvas_getWidth(this.id); }
               getHeight()     { return __canvas_getHeight(this.id); }
 
@@ -595,9 +973,6 @@ module Sunflower
               stop()  { __canvas_stop(this.id); }
             }
 
-            // ═══════════════════════════════════════════════════
-            //  Canvas3D — new 3D API
-            // ═══════════════════════════════════════════════════
             class Canvas3D {
               constructor(id, opts) {
                 opts = opts || {};
@@ -609,7 +984,6 @@ module Sunflower
                 __canvas3d_init(id);
                 __canvasCallbacks[id] = {};
 
-                // 3D canvas still gets a 2D context overlay for HUD / debug text
                 __canvasContexts[id] = {
                   clear(color)                          { __canvas3d_clear(id, color || '#000000'); },
                   fillRect(x, y, w, h, color)           { __canvas_fillRect(id, x, y, w, h, color || '#ffffff'); },
@@ -622,44 +996,61 @@ module Sunflower
                 };
               }
 
-              // ── Camera ──
               setCamera(opts) {
                 const p = opts.position || [0, 0, 5];
                 const t = opts.target || [0, 0, 0];
-                const fov = opts.fov || 60;
-                const near = opts.near || 0.1;
-                const far = opts.far || 1000;
-                __canvas3d_setCamera(this.id, p[0], p[1], p[2], t[0], t[1], t[2], fov, near, far);
+                __canvas3d_setCamera(this.id, p[0], p[1], p[2], t[0], t[1], t[2], opts.fov || 60, opts.near || 0.1, opts.far || 1000);
               }
-              setCameraOrthographic(enabled, size) {
-                __canvas3d_setCameraOrthographic(this.id, enabled ? "true" : "false", size || 10);
-              }
+              setCameraOrthographic(enabled, size) { __canvas3d_setCameraOrthographic(this.id, enabled ? "true" : "false", size || 10); }
               orbitCamera(yaw, pitch) { __canvas3d_orbitCamera(this.id, yaw, pitch); }
-              zoomCamera(amount)      { __canvas3d_zoomCamera(this.id, amount); }
+              zoomCamera(amount) { __canvas3d_zoomCamera(this.id, amount); }
 
-              // ── Lighting ──
+              enableOrbitControls() { __canvas3d_enableOrbitControls(this.id); }
+              setOrbitTarget(x, y, z) { __canvas3d_setOrbitTarget(this.id, x, y, z); }
+              orbitScroll(delta) { __canvas3d_orbitScroll(this.id, delta); }
+
               addLight(opts) {
                 const type = opts.type || "directional";
                 const pos = opts.position || [0, 0, 0];
                 const dir = opts.direction || [0, -1, 0];
-                const color = opts.color || "#ffffff";
-                const intensity = opts.intensity || 1.0;
-                __canvas3d_addLight(this.id, type, pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], color, intensity);
+                __canvas3d_addLight(this.id, type, pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], opts.color || "#ffffff", opts.intensity || 1.0);
               }
+              addAmbientLight(color, intensity) { __canvas3d_addAmbientLight(this.id, color || "#1a1a1a", intensity || 1.0); }
               setAmbient(color) { __canvas3d_setAmbient(this.id, color || "#1a1a1a"); }
 
-              // ── Mesh management ──
-              addMesh(name, type, opts) {
-                opts = opts || {};
-                return __canvas3d_addMesh(this.id, name, type || "cube", JSON.stringify(opts));
-              }
-              setMeshPosition(name, x, y, z)  { __canvas3d_setMeshPosition(this.id, name, x, y, z); }
+              addMesh(name, type, opts) { return __canvas3d_addMesh(this.id, name, type || "cube", JSON.stringify(opts || {})); }
+              setMeshPosition(name, x, y, z) { __canvas3d_setMeshPosition(this.id, name, x, y, z); }
               rotateMesh(name, pitch, yaw, roll) { __canvas3d_rotateMesh(this.id, name, pitch, yaw, roll); }
-              setMeshScale(name, sx, sy, sz)  { __canvas3d_setMeshScale(this.id, name, sx, sy, sz); }
-              setMeshVisible(name, visible)   { __canvas3d_setMeshVisible(this.id, name, visible ? "true" : "false"); }
-              removeMesh(name)                { __canvas3d_removeMesh(this.id, name); }
+              setMeshScale(name, sx, sy, sz) { __canvas3d_setMeshScale(this.id, name, sx, sy, sz); }
+              setMeshVisible(name, visible) { __canvas3d_setMeshVisible(this.id, name, visible ? "true" : "false"); }
+              removeMesh(name) { __canvas3d_removeMesh(this.id, name); }
+              setMeshMaterial(name, opts) { __canvas3d_setMeshMaterial(this.id, name, JSON.stringify(opts || {})); }
+              lookAt(name, x, y, z) { __canvas3d_lookAt(this.id, name, x, y, z); }
 
-              // ── Callbacks ──
+              addGroup(name) { return __canvas3d_addGroup(this.id, name); }
+              reparent(childName, parentName) { __canvas3d_reparent(this.id, childName, parentName); }
+
+              addGridHelper(size, divisions) { __canvas3d_addGridHelper(this.id, size || 10, divisions || 10); }
+              addAxesHelper(length) { __canvas3d_addAxesHelper(this.id, length || 1); }
+
+              setFog(opts) {
+                opts = opts || {};
+                const type = opts.type || "linear";
+                const color = opts.color || "#cccccc";
+                __canvas3d_setFog(this.id, type, color, opts.near || opts.density || 10, opts.far || 100);
+              }
+              clearFog() { __canvas3d_clearFog(this.id); }
+              setFrustumCulling(enabled) { __canvas3d_setFrustumCulling(this.id, enabled ? "true" : "false"); }
+
+              raycast(screenX, screenY) { return JSON.parse(__canvas3d_raycast(this.id, screenX, screenY)); }
+              getStats() { return JSON.parse(__canvas3d_getStats(this.id)); }
+
+              loadOBJ(name, path, opts) { return __canvas3d_loadOBJ(this.id, name, path, JSON.stringify(opts || {})); }
+              loadOBJString(name, objSource, opts) { return __canvas3d_loadOBJString(this.id, name, objSource, JSON.stringify(opts || {})); }
+              getObjectChildren(name) { return JSON.parse(__canvas3d_getObjectChildren(this.id, name)); }
+              getObjectPosition(name) { return JSON.parse(__canvas3d_getObjectPosition(this.id, name)); }
+              cloneObject(sourceName, cloneName) { return __canvas3d_cloneObject(this.id, sourceName, cloneName); }
+
               onDraw(cb)      { __canvasCallbacks[this.id].onDraw = cb; }
               onUpdate(cb)    { __canvasCallbacks[this.id].onUpdate = cb; }
               onKeyDown(cb)   { __canvasCallbacks[this.id].onKeyDown = cb; }
@@ -668,12 +1059,10 @@ module Sunflower
               onMouseUp(cb)   { __canvasCallbacks[this.id].onMouseUp = cb; }
               onMouseMove(cb) { __canvasCallbacks[this.id].onMouseMove = cb; }
 
-              // ── Input ──
               isKeyDown(key)  { return __canvas_isKeyDown(this.id, key); }
               mouseX()        { return __canvas_getMouseX(this.id); }
               mouseY()        { return __canvas_getMouseY(this.id); }
               isMouseDown()   { return __canvas_isMouseDown(this.id); }
-
               getWidth()      { return __canvas_getWidth(this.id); }
               getHeight()     { return __canvas_getHeight(this.id); }
 
@@ -684,9 +1073,6 @@ module Sunflower
             export { Canvas, Canvas3D };
           JS
         end
-
-        # Widget creation
-        # Called by __create_widget when kind == "Canvas"
 
         def self.create_widget(id : String, props : JSON::Any) : Gtk::GLArea
           state = State.get(id)
@@ -699,14 +1085,13 @@ module Sunflower
           gl_area.auto_render = false
           gl_area.focusable = true
           gl_area.can_focus = true
-
           gl_area.has_depth_buffer = true
 
           gl_area.realize_signal.connect do
             gl_area.make_current
             state.flat_renderer.initialize_gl
             state.text_renderer.setup(gl_area)
-            state.dimensional_renderer.try(&.initialize_gl)
+            state.scene_renderer.try(&.initialize_gl)
           end
 
           gl_area.render_signal.connect do |context|
@@ -715,12 +1100,10 @@ module Sunflower
             else
               render_2d_frame(state, gl_area)
             end
-
             true
           end
 
           attach_input_controllers(id, gl_area)
-
           gl_area
         end
 
@@ -736,22 +1119,14 @@ module Sunflower
 
           state.draw_commands.each do |cmd|
             case cmd
-            when ClearCommand
-              renderer.clear(cmd.r.to_f32, cmd.g.to_f32, cmd.b.to_f32, cmd.a.to_f32)
-            when FillRectCommand
-              renderer.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
-            when StrokeRectCommand
-              renderer.stroke_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
-            when FillCircleCommand
-              renderer.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
-            when StrokeCircleCommand
-              renderer.stroke_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
-            when DrawLineCommand
-              renderer.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
-            when FillTriangleCommand
-              renderer.fill_triangle(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a)
-            when FillTextCommand
-              state.text_renderer.render(renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
+            when ClearCommand      then renderer.clear(cmd.r.to_f32, cmd.g.to_f32, cmd.b.to_f32, cmd.a.to_f32)
+            when FillRectCommand   then renderer.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
+            when StrokeRectCommand then renderer.stroke_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+            when FillCircleCommand then renderer.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
+            when StrokeCircleCommand then renderer.stroke_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+            when DrawLineCommand   then renderer.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+            when FillTriangleCommand then renderer.fill_triangle(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a)
+            when FillTextCommand   then state.text_renderer.render(renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
             end
           end
 
@@ -760,43 +1135,37 @@ module Sunflower
         end
 
         private def self.render_3d_frame(state : State, gl_area : Gtk::GLArea) : Nil
-          r3d = state.dimensional_renderer
-          return unless r3d && r3d.initialized?
+          sr = state.scene_renderer
+          scene = state.scene
+          cam = state.camera
+          return unless sr && scene && cam
 
           scale = gl_area.scale_factor
           w = gl_area.allocated_width
           h = gl_area.allocated_height
 
-          r3d.begin_frame(w * scale, h * scale)
-          r3d.clear(state.clear_color)
-          r3d.render_scene(w, h)
-          r3d.end_frame
+          sr.render(scene, cam, w * scale, h * scale)
 
-          # 2D overlay (HUD) — draw any 2D commands on top
           unless state.draw_commands.empty?
-            flat_renderer = state.flat_renderer
-            if flat_renderer.initialized?
-              flat_renderer.begin_frame(w * scale, h * scale, w, h)
+            flat = state.flat_renderer
+            if flat.initialized?
+              LibGL.glDisable(LibGL::GL_DEPTH_TEST)
+              flat.begin_frame(w * scale, h * scale, w, h)
               state.draw_commands.each do |cmd|
                 case cmd
-                when FillRectCommand
-                  flat_renderer.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
-                when FillTextCommand
-                  state.text_renderer.render(flat_renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
-                when FillCircleCommand
-                  flat_renderer.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
-                when DrawLineCommand
-                  flat_renderer.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+                when FillRectCommand   then flat.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
+                when FillTextCommand   then state.text_renderer.render(flat, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
+                when FillCircleCommand then flat.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
+                when DrawLineCommand   then flat.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
                 end
               end
               state.text_renderer.tick
-              flat_renderer.end_frame
+              flat.end_frame
             end
           end
         end
 
         private def self.attach_input_controllers(id : String, gl_area : Gtk::GLArea) : Nil
-          # Keyboard
           key_controller = Gtk::EventControllerKey.new
           key_controller.key_pressed_signal.connect do |key_val, _, _|
             canvas = State.get(id)
@@ -827,7 +1196,6 @@ module Sunflower
           end
           gl_area.add_controller(key_controller)
 
-          # Mouse motion
           motion = Gtk::EventControllerMotion.new
           motion.motion_signal.connect do |x, y|
             canvas = State.get(id)
@@ -844,7 +1212,6 @@ module Sunflower
           end
           gl_area.add_controller(motion)
 
-          # Mouse click
           click = Gtk::GestureClick.new
           click.pressed_signal.connect do |_, x, y|
             canvas = State.get(id)
