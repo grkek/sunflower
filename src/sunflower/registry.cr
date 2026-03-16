@@ -70,11 +70,11 @@ module Sunflower
       collect_widget_state(component.widget, state)
 
       case component.kind
-      when "Box"         then collect_box_state(component.widget.as(Gtk::Box), state)
-      when "Button"      then collect_button_state(component.widget.as(Gtk::Button), state)
-      when "Entry"       then collect_entry_state(component.widget.as(Gtk::Entry), state)
-      when "Image"       then collect_image_state(component.widget.as(Gtk::Picture), state)
-      when "Label"       then collect_label_state(component.widget.as(Gtk::Label), state)
+      when "Box"    then collect_box_state(component.widget.as(Gtk::Box), state)
+      when "Button" then collect_button_state(component.widget.as(Gtk::Button), state)
+      when "Entry"  then collect_entry_state(component.widget.as(Gtk::Entry), state)
+      when "Image"  then collect_image_state(component.widget.as(Gtk::Picture), state)
+      when "Label"  then collect_label_state(component.widget.as(Gtk::Label), state)
       when "Frame", "ListBox", "ScrolledWindow", "Switch", "Tab", "TextView"
         # Common state only
       end

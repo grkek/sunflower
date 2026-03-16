@@ -192,6 +192,7 @@ Sunflower uses an XML-based markup language. Every application starts with an `<
 | `Frame` | Visual grouping container with optional label. |
 | `Tab` | Tabbed container. |
 | `Switch` | Toggle switch. |
+| `Canvas` | GPU-accelerated 2D drawing surface for games and visualizations. |
 | `HorizontalSeparator` | Horizontal divider line. |
 | `VerticalSeparator` | Vertical divider line. |
 
@@ -244,6 +245,18 @@ Style your application with GTK CSS:
 ```
 
 ## JavaScript API
+
+### ES Module Imports
+
+Sunflower's standard library modules are available as ES module imports:
+
+```javascript
+import { Canvas } from "canvas";
+import { read, write, exists, mkdir } from "fs";
+import { get, post, download } from "http";
+```
+
+The module loader checks built-in modules first, then falls back to loading `.js` files from disk for user modules.
 
 ### The `$` Object
 
@@ -525,63 +538,235 @@ $.onReady(function() {
 });
 ```
 
-## Built-in Modules
+## 2D Game Engine
 
-### `$.fs` — File System
+Sunflower includes a GPU-accelerated 2D Canvas for building games and interactive visualizations. Rendering is done through OpenGL via GTK4's `GLArea` widget with batched draw calls.
+
+### Getting Started
+
+Add a `<Canvas>` element to your JSX layout and import the `Canvas` class:
+
+```jsx
+import { Canvas } from "canvas";
+
+function MyGame() {
+  useEffect(function() {
+    const canvas = new Canvas("game", {
+      width: 800,
+      height: 600,
+      framesPerSecond: 60
+    });
+
+    canvas.onDraw(function(context) {
+      context.clear("#000000");
+      context.fillRect(100, 100, 50, 50, "#ff0000");
+    });
+
+    canvas.start();
+  }, []);
+
+  return (
+    <Box orientation="vertical" expand="true">
+      <Canvas id="game" expand="true" />
+    </Box>
+  );
+}
+```
+
+### Canvas Constructor
 
 ```javascript
+const canvas = new Canvas(id, options);
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `width` | number | 800 | Requested width in logical pixels |
+| `height` | number | 600 | Requested height in logical pixels |
+| `framesPerSecond` | number | 60 | Target frame rate |
+
+The actual canvas size may differ from the requested size when `expand="true"` is set — use `canvas.getWidth()` and `canvas.getHeight()` to read the real dimensions.
+
+### Game Loop
+
+The canvas runs two callbacks per frame at the configured frame rate:
+
+```javascript
+// Called before drawing — update game state here
+canvas.onUpdate(function(dt) {
+  // dt is the time since last frame in seconds
+  player.x += player.speed * dt;
+});
+
+// Called after update — draw your frame here
+canvas.onDraw(function(context) {
+  context.clear("#000000");
+  context.fillRect(player.x, player.y, 32, 32, "#00ff00");
+});
+
+// Start the game loop
+canvas.start();
+
+// Stop the game loop
+canvas.stop();
+```
+
+### Drawing API
+
+The context object passed to `onDraw` provides these drawing primitives:
+
+```javascript
+canvas.onDraw(function(context) {
+  // Clear the entire canvas
+  context.clear("#000000");
+
+  // Filled rectangle
+  context.fillRect(x, y, width, height, color);
+
+  // Stroked rectangle (outline only)
+  context.strokeRect(x, y, width, height, color, lineWidth);
+
+  // Filled circle
+  context.fillCircle(centerX, centerY, radius, color);
+
+  // Stroked circle (outline only)
+  context.strokeCircle(centerX, centerY, radius, color, lineWidth);
+
+  // Line between two points
+  context.drawLine(x1, y1, x2, y2, color, lineWidth);
+
+  // Filled triangle
+  context.fillTriangle(x1, y1, x2, y2, x3, y3, color);
+
+  // Text (placeholder — renders as a rectangle until font atlas is implemented)
+  context.fillText(text, x, y, color, fontSize);
+});
+```
+
+All colors are hex strings with optional alpha: `"#ff0000"`, `"#ff000080"` (50% transparent red).
+
+### Input
+
+```javascript
+// Keyboard — poll in onUpdate
+canvas.onUpdate(function(dt) {
+  if (canvas.isKeyDown("w")) player.y -= speed;
+  if (canvas.isKeyDown("s")) player.y += speed;
+  if (canvas.isKeyDown("Left")) player.x -= speed;
+  if (canvas.isKeyDown("Right")) player.x += speed;
+});
+
+// Keyboard — event callbacks
+canvas.onKeyDown(function(key) {
+  console.log("Pressed: " + key);
+});
+
+canvas.onKeyUp(function(key) {
+  console.log("Released: " + key);
+});
+
+// Mouse — poll in onUpdate
+canvas.onUpdate(function(dt) {
+  var mx = canvas.mouseX();
+  var my = canvas.mouseY();
+  var pressed = canvas.isMouseDown();
+});
+
+// Mouse — event callbacks
+canvas.onMouseDown(function(x, y) { });
+canvas.onMouseUp(function(x, y) { });
+canvas.onMouseMove(function(x, y) { });
+```
+
+Key names follow GDK naming: `"w"`, `"s"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`, `"space"`, `"Return"`, etc.
+
+### Responsive Canvas
+
+The canvas automatically adapts to HiDPI displays (Retina). Use `getWidth()` and `getHeight()` to read the actual logical dimensions and make your game responsive to window resizing:
+
+```javascript
+canvas.onUpdate(function(dt) {
+  var W = canvas.getWidth();
+  var H = canvas.getHeight();
+
+  // Clamp player to canvas bounds
+  player.x = Math.max(0, Math.min(W - player.size, player.x));
+  player.y = Math.max(0, Math.min(H - player.size, player.y));
+});
+
+canvas.onDraw(function(context) {
+  var W = canvas.getWidth();
+  var H = canvas.getHeight();
+
+  context.clear("#000");
+  // Center line
+  context.drawLine(W / 2, 0, W / 2, H, "#333", 2);
+});
+```
+
+## Built-in Modules
+
+Sunflower's standard library is available as ES module imports.
+
+### `fs` — File System
+
+```javascript
+import { read, write, append, exists, remove, mkdir, readdir, stat, writeBytes, readBytes } from "fs";
+
 // Read / write / append
-var content = await $.fs.read("/path/to/file.txt");
-await $.fs.write("/path/to/file.txt", "Hello!");
-await $.fs.append("/path/to/log.txt", "New entry\n");
+const content = await read("/path/to/file.txt");
+await write("/path/to/file.txt", "Hello!");
+await append("/path/to/log.txt", "New entry\n");
 
 // Check existence and delete
-var exists = await $.fs.exists("/path/to/file.txt");
-await $.fs.delete("/path/to/file.txt");
+const exists = await exists("/path/to/file.txt");
+await remove("/path/to/file.txt");
 
 // Directories
-await $.fs.mkdir("/path/to/new/dir");
-var entries = await $.fs.readdir("/path/to/dir");
+await mkdir("/path/to/new/dir");
+const entries = await readdir("/path/to/dir");
 
 // File info
-var info = await $.fs.statistics("/path/to/file.txt");
+const info = await stat("/path/to/file.txt");
 console.log(info.size);
 console.log(info.isFile);
 console.log(info.isDirectory);
 console.log(info.modifiedAt);
 
 // Binary data
-await $.fs.writeBytes("/path/to/file.bin", new Uint8Array([0x89, 0x50, 0x4E, 0x47]));
-var bytes = await $.fs.readBytes("/path/to/file.bin");
+await writeBytes("/path/to/file.bin", new Uint8Array([0x89, 0x50, 0x4E, 0x47]));
+const bytes = await readBytes("/path/to/file.bin");
 ```
 
-### `$.http` — Networking
+### `http` — Networking
 
 ```javascript
+import { get, post, put, patch, del, request, download } from "http";
+
 // GET
-var res = await $.http.get("https://api.example.com/data");
+const res = await get("https://api.example.com/data");
 console.log(res.status);
 console.log(res.body);
 console.log(res.headers);
 
 // GET with headers
-var res = await $.http.get("https://api.example.com/data", {
+const res = await get("https://api.example.com/data", {
   "Authorization": "Bearer token123"
 });
 
 // POST JSON
-var res = await $.http.post("https://api.example.com/users",
-  JSON.stringify({ name: "Giorgi" }),
+const res = await post("https://api.example.com/users",
+  { name: "Giorgi" },
   { "Content-Type": "application/json" }
 );
 
 // PUT, PATCH, DELETE
-await $.http.put(url, body, headers);
-await $.http.patch(url, body, headers);
-await $.http.delete(url, headers);
+await put(url, body, headers);
+await patch(url, body, headers);
+await del(url, headers);
 
 // Generic request
-var res = await $.http.request({
+const res = await request({
   url: "https://api.example.com/resource",
   method: "PATCH",
   headers: { "Content-Type": "application/json" },
@@ -589,24 +774,51 @@ var res = await $.http.request({
 });
 
 // Download a file
-var dl = await $.http.download("https://example.com/image.png", "/tmp/image.png");
+const dl = await download("https://example.com/image.png", "/tmp/image.png");
 console.log("Downloaded " + dl.bytes + " bytes to " + dl.path);
 ```
+
+### `canvas` — 2D Game Engine
+
+```javascript
+import { Canvas } from "canvas";
+
+const canvas = new Canvas("myCanvas", { width: 800, height: 600, framesPerSecond: 60 });
+
+canvas.onUpdate(function(dt) { /* game logic */ });
+canvas.onDraw(function(context) { /* rendering */ });
+canvas.start();
+```
+
+See the [2D Game Engine](#2d-game-engine) section for the full API reference.
 
 ### Error Handling
 
 All async module calls return an `error` field on failure instead of throwing:
 
 ```javascript
-var res = await $.http.get("https://invalid.example.com");
+import { get } from "http";
+import { read } from "fs";
+
+const res = await get("https://invalid.example.com");
 if (res.error) {
   console.error("Request failed: " + res.error);
 }
 
-var content = await $.fs.read("/nonexistent/file.txt");
+const content = await read("/nonexistent/file.txt");
 if (content.error) {
   console.error("Read failed: " + content.error);
 }
+```
+
+### Legacy `$` API
+
+The standard library modules are also available on the global `$` object for backward compatibility:
+
+```javascript
+// These still work
+await $.fs.read("/path/to/file.txt");
+await $.http.get("https://example.com");
 ```
 
 ## Console
@@ -672,6 +884,12 @@ Sunflower's async system bridges Crystal fibers and JavaScript promises:
 
 This gives you true non-blocking async in JS while all heavy lifting happens in Crystal fibers — no thread pools, no callback hell, and the GTK main loop never blocks.
 
+### The Module Loader
+
+Sunflower uses a custom ES module loader that integrates with QuickJS's native `import`/`export` system. When you write `import { Canvas } from "canvas"`, QuickJS calls into a C++ bridge that checks Sunflower's built-in module registry first. If the module isn't registered, it falls back to loading `.js` files from disk with path resolution relative to the importing file.
+
+Built-in modules register their JavaScript source at startup. The source uses standard ES module syntax (`export class`, `export function`) and calls into native Crystal bindings under the hood.
+
 ### The Job Drain
 
 A GLib timer fires every 16ms to:
@@ -711,6 +929,12 @@ In JSX mode, the Seed runtime includes a virtual DOM reconciler that diffs old a
 5. Entry widgets are never overwritten during updates to preserve user input
 
 This means `useState` triggers efficient in-place updates — not a full tear-down and rebuild.
+
+### The 2D Renderer
+
+The Canvas module uses a batched OpenGL renderer on top of GTK4's `GLArea`. Each frame, JavaScript draw commands are collected into a command buffer (clear, fillRect, fillCircle, etc.). When the GLArea renders, the Crystal side walks the command buffer and pushes vertices into a single VBO, drawing everything in one or a few `glDrawArrays` calls.
+
+The renderer uses an orthographic projection with `(0,0)` at the top-left corner. HiDPI displays are handled automatically — the viewport scales to physical pixels while the projection stays in logical coordinates, so game code doesn't need to know about Retina scaling.
 
 ## Contributing
 

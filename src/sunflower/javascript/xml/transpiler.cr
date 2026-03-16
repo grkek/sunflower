@@ -267,7 +267,7 @@ module Sunflower
           native_widgets = %w[
             Box Label Button Entry Image Frame Tab ListBox ScrolledWindow
             HorizontalSeparator VerticalSeparator Switch Spinner ProgressBar
-            TextView
+            TextView Canvas
           ]
 
           if native_widgets.includes?(tag)
