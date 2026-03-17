@@ -106,7 +106,7 @@ Sunflower supports three development styles:
 
 ### 1. Markup Mode
 
-Define your UI in XML with inline or external scripts. Best for simpler apps or when you want a clear separation between structure and logic. In markup mode, components are accessed through the `__runtime` global which is available without any imports.
+Define your UI in XML with inline or external scripts. Best for simpler apps or when you want a clear separation between structure and logic. In markup mode, components are accessed through the `Runtime` global which is available without any imports.
 
 ```xml
 <Application applicationId="com.example.app">
@@ -114,7 +114,7 @@ Define your UI in XML with inline or external scripts. Best for simpler apps or 
   <Window title="My App" width="800" height="600">
     <Box orientation="vertical">
       <Label id="title">Hello!</Label>
-      <Button id="btn">Click</Button>
+      <Button id="button">Click</Button>
     </Box>
   </Window>
   <Script src="scripts/index.js" />
@@ -123,10 +123,10 @@ Define your UI in XML with inline or external scripts. Best for simpler apps or 
 
 ```javascript
 // scripts/index.js — markup mode, no imports needed
-__runtime.onReady(function() {
-  var btn = __runtime.getComponentById("btn");
-  btn.on.press = function() {
-    __runtime.getComponentById("title").setText("Clicked!");
+Runtime.onReady(function() {
+  var button = Runtime.getComponentById("button");
+  button.on.press = function() {
+    Runtime.getComponentById("title").setText("Clicked!");
   };
 });
 ```
@@ -225,7 +225,7 @@ The Crystal bridge connects GTK4 widgets to JavaScript objects. Every widget get
 
 The runtime is split into two layers:
 
-- **`__runtime`** — a lightweight global object that the Crystal bridge writes to. Handles windows, lifecycle callbacks, and component lookups. Always available, no imports needed.
+- **`Runtime`** — a lightweight global object that the Crystal bridge writes to. Handles windows, lifecycle callbacks, and component lookups. Always available, no imports needed.
 - **`"stigma"` module** — the full JSX runtime including hooks, virtual DOM, reconciler, and rendering. Loaded lazily on first import — markup-only apps never pay for it.
 
 ## Markup
@@ -344,30 +344,28 @@ import Stigma, { useState, useEffect } from "stigma";
 | `render` | Mount a component into a container |
 | `onReady` | Register a callback for when the app is ready |
 | `onExit` | Register a callback for when the app exits |
-| `getWindow` | Get a window object by ID |
 | `getComponentById` | Get a component by ID (optionally scoped to a window) |
 | `findComponentById` | Search all windows for a component |
-| `default` | The full `Stigma` object (includes `windows`, `mainWindow`, `windowIds`, `componentIds`) |
 
-### The `__runtime` Object
+### The `Runtime` Object
 
-The `__runtime` global is the internal bridge between Crystal and JavaScript. It's always available without imports and is useful in markup mode scripts:
+The `Runtime` global is the internal bridge between Crystal and JavaScript. It's always available without imports and is useful in markup mode scripts:
 
 ```javascript
 // Component access
-var btn = __runtime.getComponentById("myButton");
-var label = __runtime.getComponentById("title", "Main");
+var button = Runtime.getComponentById("myButton");
+var label = Runtime.getComponentById("title", "Main");
 
 // Window access
-__runtime.windows["Main"];
-__runtime.getWindow("Main");
+Runtime.windows["Main"];
+Runtime.getWindow("Main");
 
 // Lifecycle
-__runtime.onReady(function() { });
-__runtime.onExit(function() { });
+Runtime.onReady(function() { });
+Runtime.onExit(function() { });
 ```
 
-In JSX mode, prefer importing from `"stigma"` instead of using `__runtime` directly.
+In JSX mode, prefer importing from `"stigma"` instead of using `Runtime` directly.
 
 ### Event Handlers
 
@@ -390,14 +388,15 @@ Stigma.getComponentById("myEntry").on.change = function(text) {
 #### Button
 
 ```javascript
-var btn = Stigma.getComponentById("myButton");
-btn.setText("New Label");
+var button = Stigma.getComponentById("myButton");
+button.setText("New Label");
 ```
 
 #### Label
 
 ```javascript
 var label = Stigma.getComponentById("myLabel");
+
 label.setText("Plain text");
 label.setLabel("Text with <b>markup</b>");
 label.getText();
@@ -411,6 +410,7 @@ label.setYAlign(0.5);
 
 ```javascript
 var entry = Stigma.getComponentById("myEntry");
+
 entry.setText("Default value");
 var text = entry.getText();
 entry.isPassword(true);
@@ -449,12 +449,13 @@ list.removeAll();
 #### Window
 
 ```javascript
-import Stigma from "stigma";
+import { Window } from "stigma";
 
-var win = Stigma.mainWindow;
-win.setTitle("New Title");
-win.maximize();
-win.minimize();
+Window.setTitle("New Title");
+Window.maximize();
+Window.minimize();
+Window.fullscreen();
+Window.unfullscreen();
 ```
 
 #### Universal Methods
@@ -462,10 +463,11 @@ win.minimize();
 Available on all components:
 
 ```javascript
-var comp = Stigma.getComponentById("any");
-comp.setVisible(false);
-comp.addCssClass("highlighted");
-comp.removeCssClass("highlighted");
+var component = Stigma.getComponentById("any");
+
+component.setVisible(false);
+component.addCssClass("highlighted");
+component.removeCssClass("highlighted");
 ```
 
 ### Component State
@@ -473,8 +475,8 @@ comp.removeCssClass("highlighted");
 Every component has a lazy `state` getter that reads the current widget state from GTK:
 
 ```javascript
-var btn = Stigma.getComponentById("myButton");
-console.log(btn.state);
+var button = Stigma.getComponentById("myButton");
+console.log(button.state);
 ```
 
 ### Lifecycle
@@ -581,7 +583,7 @@ function Timer() {
 
 ### Composing Components
 
-Nest components and pass props:
+Nest components and pass properties:
 
 ```jsx
 import Stigma from "stigma";
@@ -666,172 +668,11 @@ Stigma.onReady(function() {
 });
 ```
 
-## 2D Game Engine
+## 2D/3D Game Engine
 
 Sunflower includes a GPU-accelerated 2D Canvas for building games and interactive visualizations. Rendering is done through OpenGL via GTK4's `GLArea` widget with batched draw calls.
 
-### Getting Started
-
-Add a `<Canvas>` element to your JSX layout and import the `Canvas` class:
-
-```jsx
-import { Canvas } from "canvas";
-import { useEffect } from "stigma";
-
-function MyGame() {
-  useEffect(function() {
-    const canvas = new Canvas("game", {
-      width: 800,
-      height: 600,
-      framesPerSecond: 60
-    });
-
-    canvas.onDraw(function(context) {
-      context.clear("#000000");
-      context.fillRect(100, 100, 50, 50, "#ff0000");
-    });
-
-    canvas.start();
-  }, []);
-
-  return (
-    <Box orientation="vertical" expand="true">
-      <Canvas id="game" expand="true" />
-    </Box>
-  );
-}
-```
-
-### Canvas Constructor
-
-```javascript
-const canvas = new Canvas(id, options);
-```
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `width` | number | 800 | Requested width in logical pixels |
-| `height` | number | 600 | Requested height in logical pixels |
-| `framesPerSecond` | number | 60 | Target frame rate |
-
-The actual canvas size may differ from the requested size when `expand="true"` is set — use `canvas.getWidth()` and `canvas.getHeight()` to read the real dimensions.
-
-### Game Loop
-
-The canvas runs two callbacks per frame at the configured frame rate:
-
-```javascript
-// Called before drawing — update game state here
-canvas.onUpdate(function(dt) {
-  // dt is the time since last frame in seconds
-  player.x += player.speed * dt;
-});
-
-// Called after update — draw your frame here
-canvas.onDraw(function(context) {
-  context.clear("#000000");
-  context.fillRect(player.x, player.y, 32, 32, "#00ff00");
-});
-
-// Start the game loop
-canvas.start();
-
-// Stop the game loop
-canvas.stop();
-```
-
-### Drawing API
-
-The context object passed to `onDraw` provides these drawing primitives:
-
-```javascript
-canvas.onDraw(function(context) {
-  // Clear the entire canvas
-  context.clear("#000000");
-
-  // Filled rectangle
-  context.fillRect(x, y, width, height, color);
-
-  // Stroked rectangle (outline only)
-  context.strokeRect(x, y, width, height, color, lineWidth);
-
-  // Filled circle
-  context.fillCircle(centerX, centerY, radius, color);
-
-  // Stroked circle (outline only)
-  context.strokeCircle(centerX, centerY, radius, color, lineWidth);
-
-  // Line between two points
-  context.drawLine(x1, y1, x2, y2, color, lineWidth);
-
-  // Filled triangle
-  context.fillTriangle(x1, y1, x2, y2, x3, y3, color);
-
-  // Text (placeholder — renders as a rectangle until font atlas is implemented)
-  context.fillText(text, x, y, color, fontSize);
-});
-```
-
-All colors are hex strings with optional alpha: `"#ff0000"`, `"#ff000080"` (50% transparent red).
-
-### Input
-
-```javascript
-// Keyboard — poll in onUpdate
-canvas.onUpdate(function(dt) {
-  if (canvas.isKeyDown("w")) player.y -= speed;
-  if (canvas.isKeyDown("s")) player.y += speed;
-  if (canvas.isKeyDown("Left")) player.x -= speed;
-  if (canvas.isKeyDown("Right")) player.x += speed;
-});
-
-// Keyboard — event callbacks
-canvas.onKeyDown(function(key) {
-  console.log("Pressed: " + key);
-});
-
-canvas.onKeyUp(function(key) {
-  console.log("Released: " + key);
-});
-
-// Mouse — poll in onUpdate
-canvas.onUpdate(function(dt) {
-  var mx = canvas.mouseX();
-  var my = canvas.mouseY();
-  var pressed = canvas.isMouseDown();
-});
-
-// Mouse — event callbacks
-canvas.onMouseDown(function(x, y) { });
-canvas.onMouseUp(function(x, y) { });
-canvas.onMouseMove(function(x, y) { });
-```
-
-Key names follow GDK naming: `"w"`, `"s"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`, `"space"`, `"Return"`, etc.
-
-### Responsive Canvas
-
-The canvas automatically adapts to HiDPI displays (Retina). Use `getWidth()` and `getHeight()` to read the actual logical dimensions and make your game responsive to window resizing:
-
-```javascript
-canvas.onUpdate(function(dt) {
-  var W = canvas.getWidth();
-  var H = canvas.getHeight();
-
-  // Clamp player to canvas bounds
-  player.x = Math.max(0, Math.min(W - player.size, player.x));
-  player.y = Math.max(0, Math.min(H - player.size, player.y));
-});
-
-canvas.onDraw(function(context) {
-  var W = canvas.getWidth();
-  var H = canvas.getHeight();
-
-  context.clear("#000");
-  // Center line
-  context.drawLine(W / 2, 0, W / 2, H, "#333", 2);
-});
-```
+Take a look at the examples or the [Tachyon](https://github.com/grkek/tachyon) library for further information.
 
 ## Built-in Modules
 
@@ -842,7 +683,7 @@ Sunflower's standard library is available as ES module imports.
 The Stigma module is the JSX runtime. It loads lazily on first import — markup-only apps never pay for the reconciler, hooks, or virtual DOM overhead.
 
 ```javascript
-import Stigma, { useState, useEffect } from "stigma";
+import Stigma, { useState, useEffect, Window } from "stigma";
 
 // State management
 const [value, setValue] = useState(initialValue);
@@ -860,10 +701,8 @@ Stigma.render("containerId", MyComponent);
 Stigma.onReady(function() { /* app is ready */ });
 Stigma.onExit(function() { /* app is closing */ });
 
-// Window & component access
-Stigma.mainWindow;
+// Component access
 Stigma.getComponentById("myButton");
-Stigma.windows;
 ```
 
 ### `fs` — File System
@@ -996,7 +835,7 @@ Sunflower exposes a UNIX socket for inter-process communication. External proces
   "directory": "/path/to/project",
   "file": "src/index.html",
   "line": 1,
-  "sourceCode": "__runtime.getComponentById('title').setText('Updated from IPC!')"
+  "sourceCode": "Runtime.getComponentById('title').setText('Updated from IPC!')"
 }
 ```
 
@@ -1011,11 +850,11 @@ Sunflower exposes a UNIX socket for inter-process communication. External proces
 ### Example
 
 ```bash
-echo '{"id":"1","directory":".","file":"repl","line":1,"sourceCode":"console.log(__runtime.componentIds)"}' \
+echo '{"id":"1","directory":".","file":"repl","line":1,"sourceCode":"console.log(Runtime.componentIds)"}' \
   | socat - UNIX-CONNECT:/tmp/<socket-id>.sock
 ```
 
-The socket path is logged on startup. IPC evaluates code in the global scope, so use `__runtime` for component and window access.
+The socket path is logged on startup. IPC evaluates code in the global scope, so use `Runtime` for component and window access.
 
 ## How It Works
 
@@ -1023,7 +862,7 @@ The socket path is logged on startup. IPC evaluates code in the global scope, so
 
 Sunflower's JavaScript runtime is split into two layers:
 
-- **`__runtime`** (global) — The Crystal bridge target. A lightweight object created eagerly at startup that holds the window registry, lifecycle callbacks, and component lookup functions. Crystal writes directly into `__runtime.windows`, calls `__runtime.flushReady()`, and binds window methods here. This is always available, even in markup-only apps.
+- **`Runtime`** (global) — The Crystal bridge target. A lightweight object created eagerly at startup that holds the window registry, lifecycle callbacks, and component lookup functions. Crystal writes directly into `Runtime.windows`, calls `Runtime.flushReady()`, and binds window methods here. This is always available, even in markup-only apps.
 
 - **`"stigma"` module** (lazy) — The full JSX runtime including `createElement`, hooks (`useState`, `useEffect`), the virtual DOM reconciler, and the `render` function. This module is only loaded when user code writes `import ... from "stigma"`. Markup-only apps that never import it pay zero cost for the reconciler.
 
@@ -1084,7 +923,7 @@ In JSX mode, the Stigma module includes a virtual DOM reconciler that diffs old 
 
 1. The component function re-runs, producing a new virtual DOM tree
 2. The reconciler walks old and new trees side by side
-3. Same element type → updates the existing GTK widget in-place (props, text, event handlers)
+3. Same element type → updates the existing GTK widget in-place (properties, text, event handlers)
 4. Different type → destroys the old widget and creates a new one
 5. Entry widgets are never overwritten during updates to preserve user input
 

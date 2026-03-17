@@ -219,47 +219,47 @@ module Sunflower
 
         private def install_js_wrappers(sandbox) : Nil
           sandbox.eval_mutex!(
-            "globalThis.__installMethods = function(comp) {\n" \
-            "  var id = comp.id;\n" \
-            "  var kind = comp.kind;\n" \
-            "  comp.setVisible = function(v) { return __widget_setVisible(id, v); };\n" \
-            "  comp.addCssClass = function(c) { return __widget_addCssClass(id, c); };\n" \
-            "  comp.removeCssClass = function(c) { return __widget_removeCssClass(id, c); };\n" \
+            "globalThis.__installMethods = function(component) {\n" \
+            "  var id = component.id;\n" \
+            "  var kind = component.kind;\n" \
+            "  component.setVisible = function(v) { return __widget_setVisible(id, v); };\n" \
+            "  component.addCssClass = function(c) { return __widget_addCssClass(id, c); };\n" \
+            "  component.removeCssClass = function(c) { return __widget_removeCssClass(id, c); };\n" \
             "  if (kind === 'LABEL') {\n" \
-            "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
-            "    comp.setLabel = function(t) { return __widget_setLabel(id, t); };\n" \
-            "    comp.setWrap = function(w) { return __widget_setWrap(id, w); };\n" \
-            "    comp.setEllipsize = function(m) { return __widget_setEllipsize(id, m); };\n" \
-            "    comp.setXAlign = function(a) { return __widget_setXAlign(id, a); };\n" \
-            "    comp.setYAlign = function(a) { return __widget_setYAlign(id, a); };\n" \
-            "    comp.getText = function() { return __widget_getText(id); };\n" \
+            "    component.setText = function(t) { return __widget_setText(id, t); };\n" \
+            "    component.setLabel = function(t) { return __widget_setLabel(id, t); };\n" \
+            "    component.setWrap = function(w) { return __widget_setWrap(id, w); };\n" \
+            "    component.setEllipsize = function(m) { return __widget_setEllipsize(id, m); };\n" \
+            "    component.setXAlign = function(a) { return __widget_setXAlign(id, a); };\n" \
+            "    component.setYAlign = function(a) { return __widget_setYAlign(id, a); };\n" \
+            "    component.getText = function() { return __widget_getText(id); };\n" \
             "  }\n" \
             "  if (kind === 'BUTTON') {\n" \
-            "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
+            "    component.setText = function(t) { return __widget_setText(id, t); };\n" \
             "  }\n" \
             "  if (kind === 'ENTRY') {\n" \
-            "    comp.setText = function(t) { return __widget_setText(id, t); };\n" \
-            "    comp.getText = function() { return __widget_getText(id); };\n" \
-            "    comp.isPassword = function(v) { return __widget_isPassword(id, v); };\n" \
+            "    component.setText = function(t) { return __widget_setText(id, t); };\n" \
+            "    component.getText = function() { return __widget_getText(id); };\n" \
+            "    component.isPassword = function(v) { return __widget_isPassword(id, v); };\n" \
             "  }\n" \
             "  if (kind === 'BOX') {\n" \
-            "    comp.append = function(childId) { return __widget_append(id, childId); };\n" \
-            "    comp.destroyChildren = function() { return __widget_destroyChildren(id); };\n" \
+            "    component.append = function(childId) { return __widget_append(id, childId); };\n" \
+            "    component.destroyChildren = function() { return __widget_destroyChildren(id); };\n" \
             "  }\n" \
             "  if (kind === 'IMAGE') {\n" \
-            "    comp.setResourcePath = function(path) {\n" \
+            "    component.setResourcePath = function(path) {\n" \
             "      var pid = __widget_setResourcePath(id, path);\n" \
             "      return __createPromise(pid);\n" \
             "    };\n" \
-            "    comp.setContentFit = function(f) { return __widget_setContentFit(id, f); };\n" \
+            "    component.setContentFit = function(f) { return __widget_setContentFit(id, f); };\n" \
             "  }\n" \
             "  if (kind === 'WINDOW') {\n" \
-            "    comp.setTitle = function(t) { return __widget_setTitle(id, t); };\n" \
-            "    comp.maximize = function() { return __widget_maximize(id); };\n" \
-            "    comp.minimize = function() { return __widget_minimize(id); };\n" \
+            "    component.setTitle = function(t) { return __widget_setTitle(id, t); };\n" \
+            "    component.maximize = function() { return __widget_maximize(id); };\n" \
+            "    component.minimize = function() { return __widget_minimize(id); };\n" \
             "  }\n" \
             "  if (kind === 'LISTBOX') {\n" \
-            "    comp.removeAll = function() { return __widget_removeAll(id); };\n" \
+            "    component.removeAll = function() { return __widget_removeAll(id); };\n" \
             "  }\n" \
             "};\n"
           )

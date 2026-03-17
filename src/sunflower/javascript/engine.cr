@@ -15,6 +15,9 @@ module Sunflower
 
       property paths : Helpers::Synchronized(Array(String)) = Helpers::Synchronized(Array(String)).new
 
+      getter scene_view : Sunflower::SceneView = Sunflower::SceneView.new
+      property last_module_namespace : Medusa::Binding::QuickJS::JSValue? = nil
+
       def self.instance : Engine
         @@instance
       end
@@ -27,7 +30,16 @@ module Sunflower
         Log.info { "Engine initialized (socket: #{@server.path})" }
 
         register_core_bindings
+        register_tachyon_module
+
         spawn accept_connections
+      end
+
+      private def register_tachyon_module : Nil
+        context = @sandbox.engine.context
+
+        Tachyon::Scripting::LibTachyonBridge.TachyonBridge_InitClasses(context.runtime)
+        Tachyon::Scripting::LibTachyonBridge.TachyonBridge_RegisterModule(context.to_unsafe)
       end
 
       def load!(path : String) : Nil
@@ -47,6 +59,20 @@ module Sunflower
         @mutex.synchronize { @sandbox.bind(name, arg_count, &block) }
       end
 
+      def eval_module!(source : String, tag : String) : Nil
+        context = @sandbox.engine.context.to_unsafe
+
+        result = Medusa::Binding::QuickJS.JS_Eval(
+          context, source, source.bytesize, tag,
+          (Medusa::Binding::QuickJS::EvalFlag::MODULE | Medusa::Binding::QuickJS::EvalFlag::COMPILE_ONLY).value
+        )
+
+        game_module = result.u.ptr.as(Medusa::Binding::QuickJS::JSModuleDef)
+        Medusa::Binding::QuickJS.JS_EvalFunction(context, result)
+
+        @last_module_namespace = Medusa::Binding::QuickJS.JS_GetModuleNamespace(context, game_module)
+      end
+
       def set_global(name : String, value) : Nil
         Log.debug { "Setting global: #{name}" }
         @sandbox.set_global(name, value)
@@ -55,7 +81,7 @@ module Sunflower
       def register_window(window_id : String) : Nil
         Log.info { "Registering window: #{window_id}" }
         @sandbox.eval_mutex!(<<-JS)
-          __runtime.windows["#{window_id}"] = {
+          Runtime.windows["#{window_id}"] = {
             id: "#{window_id}",
             components: {},
             isMounted: true,
@@ -66,12 +92,12 @@ module Sunflower
 
       def flush_ready : Nil
         Log.debug { "Flushing onReady callbacks" }
-        @sandbox.eval_mutex!("__runtime.flushReady();")
+        @sandbox.eval_mutex!("Runtime.flushReady();")
       end
 
       def flush_exit : Nil
         Log.debug { "Flushing onExit callbacks" }
-        @sandbox.eval_mutex!("__runtime.flushExit();")
+        @sandbox.eval_mutex!("Runtime.flushExit();")
       end
 
       def close : Nil
@@ -121,7 +147,6 @@ module Sunflower
 
         # Core modules
         StandardLibrary::Console.new.register(@sandbox, self)
-        StandardLibrary::Dispatch.new.register(@sandbox, self)
         StandardLibrary::State.new.register(@sandbox, self)
         StandardLibrary::Promise.new.register(@sandbox, self)
 
@@ -129,9 +154,6 @@ module Sunflower
         StandardLibrary::FileSystem.new.register(@sandbox, self)
         StandardLibrary::HTTP.new.register(@sandbox, self)
         StandardLibrary::Widget.new.register(@sandbox, self)
-
-        # Game engine
-        StandardLibrary::Canvas.new.register(@sandbox, self)
 
         # Module loader
         ModuleLoader.install(@sandbox.engine.runtime)

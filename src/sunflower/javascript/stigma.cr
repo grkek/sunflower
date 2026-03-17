@@ -10,7 +10,7 @@ module Sunflower
           Stigma.create(
             parent_id: args[0].as_s,
             kind: args[1].as_s,
-            props_json: args[2].as_s
+            properties_json: args[2].as_s
           )
         end
 
@@ -27,32 +27,32 @@ module Sunflower
         Log.debug { "Loading minimal runtime" }
         sandbox.eval_mutex! <<-JS
           (function() {
-            globalThis.__runtime = {
+            var readyCallbacks = [];
+            var exitCallbacks = [];
+            var isReady = false;
+
+            globalThis.Runtime = {
               windows: {},
 
-              _readyCallbacks: [],
-              _exitCallbacks: [],
-              _isReady: false,
-
               onReady: function(cb) {
-                this._isReady ? cb() : this._readyCallbacks.push(cb);
+                isReady ? cb() : readyCallbacks.push(cb);
               },
 
               onExit: function(cb) {
-                this._exitCallbacks.push(cb);
+                exitCallbacks.push(cb);
               },
 
               flushReady: function() {
-                this._isReady = true;
-                for (var i = 0; i < this._readyCallbacks.length; i++) {
-                  this._readyCallbacks[i]();
+                isReady = true;
+                for (let i = 0; i < readyCallbacks.length; i++) {
+                  readyCallbacks[i]();
                 }
-                this._readyCallbacks = [];
+                readyCallbacks = [];
               },
 
               flushExit: function() {
-                for (var i = 0; i < this._exitCallbacks.length; i++) {
-                  this._exitCallbacks[i]();
+                for (let i = 0; i < exitCallbacks.length; i++) {
+                  exitCallbacks[i]();
                 }
               },
 
@@ -60,29 +60,37 @@ module Sunflower
                 return this.windows[id] || null;
               },
 
-              getComponentById: function(componentId, windowId) {
+              getComponentById: function(id, windowId) {
                 if (windowId) {
-                  var w = this.windows[windowId];
-                  return w ? (w.components[componentId] || null) : null;
+                  let window = this.windows[windowId];
+                  return window && window.components[id] || null;
                 }
-                return this.findComponentById(componentId);
+                return this.findComponentById(id);
               },
 
-              findComponentById: function(componentId) {
-                for (var key in this.windows) {
-                  var w = this.windows[key];
-                  if (w.components && w.components[componentId]) {
-                    return w.components[componentId];
-                  }
+              findComponentById: function(id) {
+                for (let key in this.windows) {
+                  let component = this.windows[key].components[id];
+                  if (component) return component;
                 }
                 return null;
               },
 
+              dispatch: function(componentId, eventName, eventData) {
+                let component = Runtime.findComponentById(componentId);
+                if (!component || !component.on) return;
+                let handler = component.on[eventName];
+
+                if (typeof handler === 'function') {
+                  handler.call(component, eventData);
+                }
+              },
+
               get componentIds() {
-                var ids = [];
-                for (var key in this.windows) {
-                  var w = this.windows[key];
-                  if (w.components) ids = ids.concat(Object.keys(w.components));
+                let ids = [];
+                for (let key in this.windows) {
+                  let components = this.windows[key].components;
+                  if (components) ids = ids.concat(Object.keys(components));
                 }
                 return ids;
               }
@@ -144,7 +152,7 @@ module Sunflower
           function _renderComponent(fiber) {
             _currentFiber = fiber;
             _hookIndex = 0;
-            var result = fiber.component(fiber.props);
+            var result = fiber.component(fiber.properties);
             _currentFiber = null;
             return result;
           }
@@ -190,7 +198,7 @@ module Sunflower
                 var fiber = _fibers[oldNode._fiberId];
                 if (fiber) {
                   newNode._fiberId = oldNode._fiberId;
-                  fiber.props = _buildComponentProps(newNode);
+                  fiber.properties = _buildComponentProps(newNode);
 
                   var oldRendered = fiber.vnode;
                   var newRendered = _renderComponent(fiber);
@@ -222,14 +230,14 @@ module Sunflower
               newNode._widgetId = oldNode._widgetId;
               var widgetId = oldNode._widgetId;
 
-              _applyProps(widgetId, newType, newNode.props);
-              _applyEventHandlers(widgetId, newNode.props);
+              _applyProps(widgetId, newType, newNode.properties);
+              _applyEventHandlers(widgetId, newNode.properties);
 
               var oldText = _getTextContent(oldNode);
               var newText = _getTextContent(newNode);
 
               if (oldText !== newText) {
-                var comp = __runtime.getComponentById(widgetId);
+                var comp = Runtime.getComponentById(widgetId);
                 if (comp) {
                   if (comp.kind === "LABEL" && comp.setText) comp.setText(newText);
                   else if (comp.kind === "BUTTON" && comp.setText) comp.setText(newText);
@@ -285,7 +293,7 @@ module Sunflower
               var fiber = {
                 id: fiberId,
                 component: vnode.type,
-                props: _buildComponentProps(vnode),
+                properties: _buildComponentProps(vnode),
                 vnode: null,
                 widgetId: null,
                 parentWidgetId: parentWidgetId
@@ -309,15 +317,15 @@ module Sunflower
               return vnode._widgetId;
             }
 
-            var propsForCreate = _buildCreateProps(vnode);
-            var widgetId = __create_widget(parentWidgetId, vnode.type, JSON.stringify(propsForCreate));
+            var propertiesForCreate = _buildCreateProps(vnode);
+            var widgetId = __create_widget(parentWidgetId, vnode.type, JSON.stringify(propertiesForCreate));
             vnode._widgetId = widgetId;
 
-            _applyEventHandlers(widgetId, vnode.props);
+            _applyEventHandlers(widgetId, vnode.properties);
 
             var textContent = _getTextContent(vnode);
             if (textContent) {
-              var comp = __runtime.getComponentById(widgetId);
+              var comp = Runtime.getComponentById(widgetId);
               if (comp) {
                 if (comp.kind === "LABEL" && comp.setText) comp.setText(textContent);
                 else if (comp.kind === "BUTTON" && comp.setText) comp.setText(textContent);
@@ -410,26 +418,26 @@ module Sunflower
           }
 
           function _buildComponentProps(vnode) {
-            var props = {};
-            for (var key in vnode.props) props[key] = vnode.props[key];
-            if (vnode.children && vnode.children.length > 0) props.children = vnode.children;
-            return props;
+            var properties = {};
+            for (var key in vnode.properties) properties[key] = vnode.properties[key];
+            if (vnode.children && vnode.children.length > 0) properties.children = vnode.children;
+            return properties;
           }
 
           function _buildCreateProps(vnode) {
-            var props = {};
-            for (var key in vnode.props) {
-              if (typeof vnode.props[key] !== "function") props[key] = vnode.props[key];
+            var properties = {};
+            for (var key in vnode.properties) {
+              if (typeof vnode.properties[key] !== "function") properties[key] = vnode.properties[key];
             }
-            return props;
+            return properties;
           }
 
-          function _applyProps(widgetId, type, props) {
-            var comp = __runtime.getComponentById(widgetId);
+          function _applyProps(widgetId, type, properties) {
+            var comp = Runtime.getComponentById(widgetId);
             if (!comp) return;
 
-            for (var key in props) {
-              var val = props[key];
+            for (var key in properties) {
+              var val = properties[key];
               if (typeof val === "function") continue;
 
               if (key === "className" && comp.removeCssClass && comp.addCssClass) {
@@ -444,8 +452,8 @@ module Sunflower
             }
           }
 
-          function _applyEventHandlers(widgetId, props) {
-            var comp = __runtime.getComponentById(widgetId);
+          function _applyEventHandlers(widgetId, properties) {
+            var comp = Runtime.getComponentById(widgetId);
             if (!comp) return;
 
             var eventMap = {
@@ -457,19 +465,19 @@ module Sunflower
               onFocusChange: "focusChange"
             };
 
-            for (var key in props) {
-              if (typeof props[key] !== "function") continue;
+            for (var key in properties) {
+              if (typeof properties[key] !== "function") continue;
               var eventName = eventMap[key];
-              if (eventName) comp.on[eventName] = props[key];
+              if (eventName) comp.on[eventName] = properties[key];
             }
 
-            if (props.className) {
-              comp._currentClasses = props.className.split(" ").filter(function(c) { return c; });
+            if (properties.className) {
+              comp._currentClasses = properties.className.split(" ").filter(function(c) { return c; });
             }
           }
 
           // Public Exports
-          export function createElement(type, props) {
+          export function createElement(type, properties) {
             var children = [];
             for (var i = 2; i < arguments.length; i++) {
               var child = arguments[i];
@@ -481,16 +489,16 @@ module Sunflower
             }
             return {
               type: type,
-              props: props || {},
+              properties: properties || {},
               children: children,
-              _key: props && props.key ? props.key : null,
+              _key: properties && properties.key ? properties.key : null,
               _widgetId: null,
               _fiberId: null
             };
           }
 
-          export var Fragment = function(props) {
-            return createElement("Box", { orientation: "vertical" }, props.children);
+          export var Fragment = function(properties) {
+            return createElement("Box", { orientation: "vertical" }, properties.children);
           };
 
           export function useState(initial) {
@@ -557,10 +565,10 @@ module Sunflower
             }
           }
 
-          export function render(containerId, component, props) {
+          export function render(containerId, component, properties) {
             var vnode;
             if (typeof component === "function") {
-              vnode = createElement(component, props || {});
+              vnode = createElement(component, properties || {});
             } else {
               vnode = component;
             }
@@ -578,11 +586,56 @@ module Sunflower
             _flushEffects();
           }
 
-          export function onReady(cb) { __runtime.onReady(cb); }
-          export function onExit(cb) { __runtime.onExit(cb); }
-          export function getWindow(id) { return __runtime.getWindow(id); }
-          export function getComponentById(id, wid) { return __runtime.getComponentById(id, wid); }
-          export function findComponentById(id) { return __runtime.findComponentById(id); }
+          class Window {
+            static get instance() {
+              return Runtime.windows["Main"] || null;
+            }
+
+            static get isFullscreen() {
+              var window = this.instance;
+              return window ? window.isFullscreen : false;
+            }
+
+            static fullscreen() {
+              var window = this.instance;
+              if (window) window.fullscreen();
+            }
+
+            static unfullscreen() {
+              var window = this.instance;
+              if (window) window.unfullscreen();
+            }
+
+            static toggleFullscreen() {
+              if (this.isFullscreen) {
+                this.unfullscreen();
+              } else {
+                this.fullscreen();
+              }
+            }
+
+            static maximize() {
+              var window = this.instance;
+              if (window) window.maximize();
+            }
+
+            static minimize() {
+              var window = this.instance;
+              if (window) window.minimize();
+            }
+
+            static close() {
+              var window = this.instance;
+              if (window) window.close();
+            }
+
+            static setTitle(title) {
+              var window = this.instance;
+              if (window) window.setTitle(title);
+            }
+          }
+
+          export { Window };
 
           export default {
             createElement: createElement,
@@ -590,23 +643,18 @@ module Sunflower
             useState: useState,
             useEffect: useEffect,
             render: render,
-            onReady: onReady,
-            onExit: onExit,
-            getWindow: getWindow,
-            getComponentById: getComponentById,
-            findComponentById: findComponentById,
-            get windows() { return __runtime.windows; },
-            get mainWindow() { return __runtime.windows["Main"] || null; },
-            get windowIds() { return Object.keys(__runtime.windows); },
-            get componentIds() { return __runtime.componentIds; }
+            onReady: function(cb) { Runtime.onReady(cb); },
+            onExit: function(cb) { Runtime.onExit(cb); },
+            getComponentById: function(id) { return Runtime.getComponentById(id); },
+            findComponentById: function(id) { return Runtime.findComponentById(id); }
           };
         JS
       end
 
-      def self.create(parent_id : String, kind : String, props_json : String) : String
-        props = JSON.parse(props_json)
-        id = props["id"]?.try(&.as_s) || Random::Secure.hex(8)
-        class_name = props["className"]?.try(&.as_s) || ""
+      def self.create(parent_id : String, kind : String, properties_json : String) : String
+        properties = JSON.parse(properties_json)
+        id = properties["id"]?.try(&.as_s) || Random::Secure.hex(8)
+        class_name = properties["className"]?.try(&.as_s) || ""
 
         parent_component = Registry.instance.registered_components[parent_id]?
         unless parent_component
@@ -616,10 +664,10 @@ module Sunflower
 
         window_id = parent_component.window_id
 
-        widget = build_widget(kind, id, props)
+        widget = build_widget(kind, id, properties)
         widget.name = id
 
-        apply_common_properties(widget, props)
+        apply_common_properties(widget, properties)
         apply_css_class(widget, class_name)
         connect_signals(widget, id)
         append_to_parent(widget, parent_component.widget)
@@ -640,69 +688,70 @@ module Sunflower
         component = Registry.instance.registered_components[widget_id]?
         return unless component
 
+        if component.kind == "Canvas"
+          JavaScript::Engine.instance.scene_view.destroy_widget(widget_id)
+        end
+
         component.widget.unparent if component.widget.parent
         Registry.instance.unregister(widget_id)
-        Log.debug { "Destroyed #{widget_id}" }
       end
 
-      private def self.build_widget(kind : String, id : String, props : JSON::Any) : Gtk::Widget
+      private def self.build_widget(kind : String, id : String, properties : JSON::Any) : Gtk::Widget
         case kind
-        when "Box"              then build_box(props)
-        when "Label"            then build_label(props)
-        when "Button"           then build_button(props)
-        when "Entry"            then build_entry(props)
-        when "Image"            then Gtk::Picture.new
-        when "ScrolledWindow"   then build_scrolled_window(props)
+        when "Box"                 then build_box(properties)
+        when "Label"               then build_label(properties)
+        when "Button"              then build_button(properties)
+        when "Entry"               then build_entry(properties)
+        when "Image"               then Gtk::Picture.new
+        when "ScrolledWindow"      then build_scrolled_window(properties)
         when "HorizontalSeparator" then Gtk::Separator.new(orientation: Gtk::Orientation::Horizontal)
         when "VerticalSeparator"   then Gtk::Separator.new(orientation: Gtk::Orientation::Vertical)
-        when "Switch"           then Gtk::Switch.new
-        when "Canvas"           then StandardLibrary::Canvas.create_widget(id, props)
+        when "Switch"              then Gtk::Switch.new
+        when "Canvas"              then JavaScript::Engine.instance.scene_view.create_widget(id, properties)
         else
           Log.warn { "Unknown widget type '#{kind}', creating Box" }
           Gtk::Box.new(orientation: Gtk::Orientation::Vertical)
         end
       end
 
-      private def self.build_box(props : JSON::Any) : Gtk::Box
-        orientation = props["orientation"]?.try(&.as_s) == "horizontal" \
-          ? Gtk::Orientation::Horizontal
-          : Gtk::Orientation::Vertical
+      private def self.build_box(properties : JSON::Any) : Gtk::Box
+        orientation = properties["orientation"]?.try(&.as_s) == "horizontal" ? Gtk::Orientation::Horizontal : Gtk::Orientation::Vertical
 
-        spacing = prop_int(props, "spacing") || 0
-        homogeneous = prop_bool(props, "homogeneous")
+        spacing = prop_int(properties, "spacing") || 0
+        homogeneous = prop_bool(properties, "homogeneous")
 
         Gtk::Box.new(orientation: orientation, spacing: spacing, homogeneous: homogeneous)
       end
 
-      private def self.build_label(props : JSON::Any) : Gtk::Label
-        label = Gtk::Label.new(str: props["text"]?.try(&.as_s) || "")
-        label.wrap = prop_bool(props, "wrap")
+      private def self.build_label(properties : JSON::Any) : Gtk::Label
+        label = Gtk::Label.new(str: properties["text"]?.try(&.as_s) || "")
+        label.wrap = prop_bool(properties, "wrap")
         label.wrap_mode = Pango::WrapMode::WordChar
         label.hexpand = true
         label.max_width_chars = 1
         label
       end
 
-      private def self.build_button(props : JSON::Any) : Gtk::Button
-        Gtk::Button.new_with_label(props["text"]?.try(&.as_s) || "")
+      private def self.build_button(properties : JSON::Any) : Gtk::Button
+        Gtk::Button.new_with_label(properties["text"]?.try(&.as_s) || "")
       end
 
-      private def self.build_entry(props : JSON::Any) : Gtk::Entry
+      private def self.build_entry(properties : JSON::Any) : Gtk::Entry
         entry = Gtk::Entry.new
-        props["text"]?.try(&.as_s).try { |t| entry.text = t }
-        props["placeHolder"]?.try(&.as_s).try { |p| entry.placeholder_text = p }
-        entry.visibility = false if props["inputType"]?.try(&.as_s) == "password"
+        properties["text"]?.try(&.as_s).try { |t| entry.text = t }
+        properties["placeHolder"]?.try(&.as_s).try { |p| entry.placeholder_text = p }
+        entry.visibility = false if properties["inputType"]?.try(&.as_s) == "password"
         entry
       end
 
-      private def self.build_scrolled_window(props : JSON::Any) : Gtk::ScrolledWindow
+      private def self.build_scrolled_window(properties : JSON::Any) : Gtk::ScrolledWindow
         sw = Gtk::ScrolledWindow.new
         sw.hscrollbar_policy = Gtk::PolicyType::Never
         sw.vscrollbar_policy = Gtk::PolicyType::Automatic
         sw.propagate_natural_width = false
         sw.propagate_natural_height = false
 
-        if prop_bool(props, "expand")
+        if prop_bool(properties, "expand")
           sw.vexpand = true
           sw.hexpand = true
         end
@@ -710,17 +759,17 @@ module Sunflower
         sw
       end
 
-      private def self.apply_common_properties(widget : Gtk::Widget, props : JSON::Any) : Nil
-        if prop_bool(props, "expand")
+      private def self.apply_common_properties(widget : Gtk::Widget, properties : JSON::Any) : Nil
+        if prop_bool(properties, "expand")
           widget.vexpand = true
           widget.hexpand = true
         end
 
-        props["horizontalAlignment"]?.try(&.as_s).try do |align|
+        properties["horizontalAlignment"]?.try(&.as_s).try do |align|
           widget.halign = parse_alignment(align)
         end
 
-        props["verticalAlignment"]?.try(&.as_s).try do |align|
+        properties["verticalAlignment"]?.try(&.as_s).try do |align|
           widget.valign = parse_alignment(align)
         end
       end
@@ -770,13 +819,13 @@ module Sunflower
 
       # Handles the common pattern where a bool prop might be
       # an actual bool OR the string "true"/"false".
-      private def self.prop_bool(props : JSON::Any, key : String) : Bool
-        props[key]?.try(&.as_bool?) || props[key]?.try(&.as_s) == "true" || false
+      private def self.prop_bool(properties : JSON::Any, key : String) : Bool
+        properties[key]?.try(&.as_bool?) || properties[key]?.try(&.as_s) == "true" || false
       end
 
-      # Handles int props that might be strings.
-      private def self.prop_int(props : JSON::Any, key : String) : Int32?
-        props[key]?.try(&.as_i?) || props[key]?.try(&.as_s.to_i?)
+      # Handles int properties that might be strings.
+      private def self.prop_int(properties : JSON::Any, key : String) : Int32?
+        properties[key]?.try(&.as_i?) || properties[key]?.try(&.as_s.to_i?)
       end
     end
   end

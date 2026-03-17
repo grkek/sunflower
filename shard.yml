@@ -11,8 +11,8 @@ dependencies:
   medusa:
     github: grkek/medusa
 
-  petal:
-    github: grkek/petal
+  tachyon:
+    github: grkek/tachyon
 
 development_dependencies:
   ameba:

@@ -8,7 +8,7 @@ require "uuid"
 
 require "gtk4"
 require "medusa"
-require "petal"
+require "tachyon"
 
 require "./sunflower/helpers/**"
 require "./sunflower/attributes/**"

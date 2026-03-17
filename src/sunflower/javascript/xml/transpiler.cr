@@ -59,7 +59,7 @@ module Sunflower
 
           Log.debug { "JSX: found <#{tag}>" }
 
-          props = read_props
+          properties = read_properties
 
           skip_ws
 
@@ -67,14 +67,14 @@ module Sunflower
             # Self-closing: <Tag ... />
             advance # /
             advance # >
-            emit_create_element(tag, props, nil)
+            emit_create_element(tag, properties, nil)
           elsif current == '>'
             # Opening tag: <Tag ...>children</Tag>
             advance # >
 
             children = read_children(tag)
 
-            emit_create_element(tag, props, children)
+            emit_create_element(tag, properties, children)
           end
         end
 
@@ -122,8 +122,8 @@ module Sunflower
           children
         end
 
-        private def read_props : Array({String, String})
-          props = [] of {String, String}
+        private def read_properties : Array({String, String})
+          properties = [] of {String, String}
 
           loop do
             skip_ws
@@ -139,14 +139,14 @@ module Sunflower
               advance # =
               skip_ws
               value = read_prop_value
-              props << {key, value}
+              properties << {key, value}
             else
               # Boolean prop: <Button disabled />
-              props << {key, "true"}
+              properties << {key, "true"}
             end
           end
 
-          props
+          properties
         end
 
         private def read_prop_name : String
@@ -306,7 +306,7 @@ module Sunflower
         end
 
         # Emit: Stigma.createElement("Tag", { key: value, ... }, child1, child2)
-        private def emit_create_element(tag : String, props : Array({String, String}), children : Array(String)?) : Nil
+        private def emit_create_element(tag : String, properties : Array({String, String}), children : Array(String)?) : Nil
           # Known native GTK widgets get quoted strings, everything else is a component reference
           native_widgets = %w[
             Box Label Button Entry Image Frame Tab ListBox ScrolledWindow
@@ -321,11 +321,11 @@ module Sunflower
           end
 
           # Props
-          if props.empty?
+          if properties.empty?
             @output << ", null"
           else
             @output << ", { "
-            props.each_with_index do |(key, value), i|
+            properties.each_with_index do |(key, value), i|
               @output << ", " if i > 0
               @output << "#{key}: #{value}"
             end

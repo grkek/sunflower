@@ -96,7 +96,7 @@ module Sunflower
         Registry.instance.register_window(window_id, widget)
 
         sandbox = JavaScript::Engine.instance.sandbox
-        path = "__runtime.windows[\"#{window_id}\"]"
+        path = "Runtime.windows[\"#{window_id}\"]"
         gtk_window = widget.as(Gtk::Window)
 
         bind_method(sandbox, path, window_id, "setTitle", 1) do |args|
@@ -106,6 +106,8 @@ module Sunflower
         bind_method(sandbox, path, window_id, "maximize", 0) { gtk_window.maximize }
         bind_method(sandbox, path, window_id, "minimize", 0) { gtk_window.minimize }
         bind_method(sandbox, path, window_id, "close", 0) { gtk_window.close }
+        bind_method(sandbox, path, window_id, "fullscreen", 0) { gtk_window.fullscreen }
+        bind_method(sandbox, path, window_id, "unfullscreen", 0) { gtk_window.unfullscreen }
 
         sandbox.eval_mutex!("__installStateGetter(#{path});")
         sandbox.eval_mutex!(<<-JS)
@@ -121,6 +123,7 @@ module Sunflower
 
       private def bind_method(sandbox, path : String, window_id : String, name : String, arity : Int32, &block : Array(Medusa::ValueWrapper) -> _) : Nil
         binding_name = "__window_#{window_id}_#{name}"
+        puts binding_name
         sandbox.bind(binding_name, arity) { |args| block.call(args) }
         sandbox.eval_mutex!("#{path}[\"#{name}\"] = #{binding_name};")
       end

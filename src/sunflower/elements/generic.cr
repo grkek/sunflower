@@ -53,7 +53,7 @@ module Sunflower
         )
       end
 
-      # Dispatches GTK events through the component's __dispatch path.
+      # Dispatches GTK events through the component's Runtime.dispatch path.
       # No string eval of user code, no eager state refresh.
       private def handle_event(id : String, event_name : String, event_data : String? = nil) : Nil
         component = Registry.instance.registered_components[id]?

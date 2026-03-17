@@ -14,19 +14,19 @@ module Sunflower
       register_js_object
     end
 
-    # The full JS path: __runtime.windows["windowId"].components["id"]
+    # The full JS path: Runtime.windows["windowId"].components["id"]
     def path : String
-      "__runtime.windows[\"#{window_id}\"].components[\"#{id}\"]"
+      %(Runtime.windows["#{window_id}"].components["#{id}"])
     end
 
     # Called from Crystal to dispatch a GTK event to JS handlers.
-    # Uses the __dispatch function which looks up `component.on[eventName]`
+    # Uses the Runtime.dispatch function which looks up `component.on[eventName]`
     # and calls it directly — no string eval of user code.
     def dispatch_event(event_name : String, event_data : String? = nil) : Nil
       source_code = if event_data
-                      "__dispatch(\"#{id}\", \"#{event_name}\", #{event_data})"
+                      "Runtime.dispatch(\"#{id}\", \"#{event_name}\", #{event_data})"
                     else
-                      "__dispatch(\"#{id}\", \"#{event_name}\")"
+                      "Runtime.dispatch(\"#{id}\", \"#{event_name}\")"
                     end
 
       engine.sandbox.eval_mutex!(source_code)
@@ -37,7 +37,7 @@ module Sunflower
     # -------------------------------------------------------------------------
     # JS Object Registration
     #
-    # Creates a component at Stigma.windows[windowId].components[id]:
+    # Creates a component at Runtime.windows[windowId].components[id]:
     # {
     #   isMounted: true,
     #   id: "...",

@@ -9,8 +9,8 @@ module Sunflower
           end
 
           sandbox.eval_mutex!(
-            "globalThis.__installStateGetter = function(comp) {\n" \
-            "  Object.defineProperty(comp, 'state', {\n" \
+            "globalThis.__installStateGetter = function(component) {\n" \
+            "  Object.defineProperty(component, 'state', {\n" \
             "    get: function() {\n" \
             "      return JSON.parse(__getState(this.id));\n" \
             "    },\n" \

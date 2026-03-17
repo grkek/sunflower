@@ -58,23 +58,16 @@ module Sunflower
           return
         end
 
-        if type == "module"
-          engine.sandbox.eval_mutex!(
-            File.read(resolved),
-            flag: Medusa::Binding::QuickJS::EvalFlag::MODULE,
-            tag: resolved
-          )
-        else
-          if path.ends_with?(".jsx")
-            source = File.read(resolved)
-            transpiled = JavaScript::XML::Transpiler.transform(source)
+        source = File.read(resolved)
 
-            is_module = engine.sandbox.engine.context.detect_module?(transpiled)
-            flag = is_module ? Medusa::Binding::QuickJS::EvalFlag::MODULE : Medusa::Binding::QuickJS::EvalFlag::STRICT
-            engine.sandbox.eval_mutex!(transpiled, flag: flag, tag: resolved)
-          else
-            engine.load!(resolved)
-          end
+        if path.ends_with?(".jsx")
+          source = JavaScript::XML::Transpiler.transform(source)
+        end
+
+        if type == "module" || engine.sandbox.engine.context.detect_module?(source)
+          engine.eval_module!(source, resolved)
+        else
+          engine.sandbox.eval_mutex!(source, tag: resolved)
         end
       end
 
