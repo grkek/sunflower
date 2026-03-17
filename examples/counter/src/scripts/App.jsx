@@ -1,3 +1,5 @@
+import Stigma, { useState } from "stigma";
+
 function App() {
   const [count, setCount] = useState(0);
 
@@ -11,6 +13,6 @@ function App() {
   );
 }
 
-$.onReady(function() {
-  $.render("root", App);
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });

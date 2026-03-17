@@ -37,135 +37,92 @@ module Sunflower
         super(@kind, @attributes, @children)
       end
 
-      # Main application window — parent is Gtk::Application.
-      # Always registered as "Main" in the JS tree.
       def build_widget(parent : Gtk::Application) : Gtk::Widget
         attributes["id"] = JSON::Any.new("Main")
-        window_attrs = Attributes::Window.from_json(attributes.to_json)
+        window_attributes = Attributes::Window.from_json(attributes.to_json)
 
-        Log.debug { "Building ApplicationWindow (title: #{window_attrs.title}, #{window_attrs.width}x#{window_attrs.height})" }
+        Log.debug { "Building ApplicationWindow (title: #{window_attributes.title}, #{window_attributes.width}x#{window_attributes.height})" }
 
         widget = Gtk::ApplicationWindow.new(
           name: "Main",
           application: parent,
-          title: window_attrs.title,
-          default_width: window_attrs.width,
-          default_height: window_attrs.height,
-          resizable: window_attrs.resizable?,
-          decorated: window_attrs.decorated?
+          title: window_attributes.title,
+          default_width: window_attributes.width,
+          default_height: window_attributes.height,
+          resizable: window_attributes.resizable?,
+          decorated: window_attributes.decorated?
         )
 
         widget.destroy_signal.connect(->exit)
-
-        register_events(widget)
-        add_class_to_css(widget, window_attrs.class_name)
-        register_window_bindings(widget, "Main")
+        finalize_widget(widget, window_attributes, "Main")
 
         widget
       end
 
-      # Secondary window — parent is a Gtk::Widget (typically the main window).
       def build_widget(parent : Gtk::Widget) : Gtk::Widget
-        window_attrs = Attributes::Window.from_json(attributes.to_json)
-        window_id = attributes["id"]?.try(&.to_s) || window_attrs.id
+        window_attributes = Attributes::Window.from_json(attributes.to_json)
+        window_id = attributes["id"]?.try(&.to_s) || window_attributes.id
 
-        Log.debug { "Building Window '#{window_id}' (title: #{window_attrs.title}, #{window_attrs.width}x#{window_attrs.height})" }
+        Log.debug { "Building Window '#{window_id}' (title: #{window_attributes.title}, #{window_attributes.width}x#{window_attributes.height})" }
 
         JavaScript::Engine.instance.register_window(window_id)
 
         widget = Gtk::Window.new(
-          title: window_attrs.title,
-          default_width: window_attrs.width,
-          default_height: window_attrs.height,
-          modal: window_attrs.modal?,
-          resizable: window_attrs.resizable?,
-          decorated: window_attrs.decorated?
+          title: window_attributes.title,
+          default_width: window_attributes.width,
+          default_height: window_attributes.height,
+          modal: window_attributes.modal?,
+          resizable: window_attributes.resizable?,
+          decorated: window_attributes.decorated?
         )
         widget.name = window_id
 
-        case parent
-        when Gtk::Window, Gtk::ApplicationWindow
-          widget.transient_for = parent.as(Gtk::Window)
+        if parent.is_a?(Gtk::Window)
+          widget.transient_for = parent
         end
 
-        register_events(widget)
-        add_class_to_css(widget, window_attrs.class_name)
-        register_window_bindings(widget, window_id)
+        finalize_widget(widget, window_attributes, window_id)
 
         widget
       end
 
-      # Binds methods directly on $.windows["windowId"]
-      # instead of creating a component. The window IS the namespace,
-      # not a component inside it.
-      #
-      # JS usage:
-      #   $.windows["Main"].setTitle("New Title");
-      #   $.windows["Main"].maximize();
+      private def finalize_widget(widget : Gtk::Widget, attrs : Attributes::Window, window_id : String) : Nil
+        register_events(widget)
+        add_class_to_css(widget, attrs.class_name)
+        register_window_bindings(widget, window_id)
+      end
+
       private def register_window_bindings(widget : Gtk::Widget, window_id : String) : Nil
-        # Track the window widget so state can be collected via __getState
         Registry.instance.register_window(window_id, widget)
 
         sandbox = JavaScript::Engine.instance.sandbox
-        path = "$.windows[\"#{window_id}\"]"
+        path = "__runtime.windows[\"#{window_id}\"]"
+        gtk_window = widget.as(Gtk::Window)
 
-        # setTitle
-        binding_name = "__window_#{window_id}_setTitle"
-        sandbox.bind(binding_name, 1) do |args|
-          title = args[0].as_s
-          case widget
-          when Gtk::ApplicationWindow then widget.title = title
-          when Gtk::Window            then widget.title = title
-          end
-          title
+        bind_method(sandbox, path, window_id, "setTitle", 1) do |args|
+          gtk_window.title = args[0].as_s
         end
-        sandbox.eval_mutex!("#{path}[\"setTitle\"] = #{binding_name};")
 
-        # maximize
-        binding_name = "__window_#{window_id}_maximize"
-        sandbox.bind(binding_name, 0) do |_args|
-          case widget
-          when Gtk::ApplicationWindow then widget.maximize
-          when Gtk::Window            then widget.maximize
-          end
-          nil
-        end
-        sandbox.eval_mutex!("#{path}[\"maximize\"] = #{binding_name};")
+        bind_method(sandbox, path, window_id, "maximize", 0) { gtk_window.maximize }
+        bind_method(sandbox, path, window_id, "minimize", 0) { gtk_window.minimize }
+        bind_method(sandbox, path, window_id, "close", 0) { gtk_window.close }
 
-        # minimize
-        binding_name = "__window_#{window_id}_minimize"
-        sandbox.bind(binding_name, 0) do |_args|
-          case widget
-          when Gtk::ApplicationWindow then widget.minimize
-          when Gtk::Window            then widget.minimize
-          end
-          nil
-        end
-        sandbox.eval_mutex!("#{path}[\"minimize\"] = #{binding_name};")
-
-        # close (secondary windows only — main window uses destroy_signal)
-        binding_name = "__window_#{window_id}_close"
-        sandbox.bind(binding_name, 0) do |_args|
-          case widget
-          when Gtk::Window then widget.close
-          end
-          nil
-        end
-        sandbox.eval_mutex!("#{path}[\"close\"] = #{binding_name};")
-
-        # Install lazy state getter on the window object itself
         sandbox.eval_mutex!("__installStateGetter(#{path});")
+        sandbox.eval_mutex!(<<-JS)
+          #{path}.on = {};
+          Object.assign(#{path}.on, {
+            press: function() {},
+            release: function() {},
+            keyPress: function() {},
+            focusChange: function() {}
+          });
+        JS
+      end
 
-        # Event handlers on the window object
-        sandbox.eval_mutex!(
-          "#{path}.on = {};\n" \
-          "Object.assign(#{path}.on, {\n" \
-          "  press: function() {},\n" \
-          "  release: function() {},\n" \
-          "  keyPress: function() {},\n" \
-          "  focusChange: function() {}\n" \
-          "});\n"
-        )
+      private def bind_method(sandbox, path : String, window_id : String, name : String, arity : Int32, &block : Array(Medusa::ValueWrapper) -> _) : Nil
+        binding_name = "__window_#{window_id}_#{name}"
+        sandbox.bind(binding_name, arity) { |args| block.call(args) }
+        sandbox.eval_mutex!("#{path}[\"#{name}\"] = #{binding_name};")
       end
     end
   end

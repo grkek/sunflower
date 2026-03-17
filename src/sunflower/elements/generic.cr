@@ -25,7 +25,7 @@ module Sunflower
             case event_name
             when "buttonPress"   then handle_event(widget.name, "press")
             when "buttonRelease" then handle_event(widget.name, "release")
-            when "motionNotify"  then handle_noop()
+            when "motionNotify"  then handle_event()
             else                      handle_event(widget.name, event_name)
             end
           end
@@ -62,7 +62,8 @@ module Sunflower
         component.dispatch_event(event_name, event_data)
       end
 
-      private def handle_noop
+      private def handle_event
+        # TODO: Currently the motionNotify is ignored because it produces noise
       end
 
       private def add_class_to_css(widget : Gtk::Widget, class_name : String?) : Nil

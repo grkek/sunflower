@@ -1,4 +1,5 @@
 import { Canvas, Canvas3D } from "canvas";
+import Stigma, { useEffect } from "stigma";
 
 class FirstPersonController {
   constructor(scene, opts) {
@@ -371,6 +372,6 @@ function App() {
   return <Game />;
 }
 
-$.onReady(function () {
-  $.render("root", App);
+Stigma.onReady(function () {
+  Stigma.render("root", App);
 });
