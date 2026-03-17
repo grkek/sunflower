@@ -2,7 +2,7 @@ require "../../src/sunflower"
 
 Log.setup do |c|
   backend = Log::IOBackend.new(STDERR, formatter: Log::ShortFormat, dispatcher: :sync)
-  c.bind("*", :debug, backend)
+  c.bind("*", :info, backend)
   c.bind("medusa.sandbox", :info, backend)
 end
 

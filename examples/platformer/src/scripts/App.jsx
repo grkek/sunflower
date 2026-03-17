@@ -481,9 +481,9 @@ function Game() {
       var H = canvas.getHeight();
 
       // Input
-      var moveLeft = canvas.isKeyDown("a") || canvas.isKeyDown("Left");
-      var moveRight = canvas.isKeyDown("d") || canvas.isKeyDown("Right");
-      var jump = canvas.isKeyDown("w") || canvas.isKeyDown("Up") || canvas.isKeyDown("space");
+      var moveLeft = canvas.isKeyDown("A") || canvas.isKeyDown("Left");
+      var moveRight = canvas.isKeyDown("D") || canvas.isKeyDown("Right");
+      var jump = canvas.isKeyDown("W") || canvas.isKeyDown("Up") || canvas.isKeyDown("Space");
 
       // Horizontal movement
       if (moveLeft) {
@@ -753,7 +753,7 @@ function Game() {
     });
 
     canvas.onKeyDown(function(key) {
-      if (key === "r" || key === "R") {
+      if (key === "R") {
         score = 0; setScore(0);
         level = 1; setLevel(1);
         setGameState("playing");

@@ -27,8 +27,8 @@ function PongGame() {
       let W = canvas.getWidth();
       let H = canvas.getHeight();
 
-      if (canvas.isKeyDown("w")) paddles.left.y -= paddles.left.speed;
-      if (canvas.isKeyDown("s")) paddles.left.y += paddles.left.speed;
+      if (canvas.isKeyDown("W")) paddles.left.y -= paddles.left.speed;
+      if (canvas.isKeyDown("S")) paddles.left.y += paddles.left.speed;
       if (canvas.isKeyDown("Up")) paddles.right.y -= paddles.right.speed;
       if (canvas.isKeyDown("Down")) paddles.right.y += paddles.right.speed;
 

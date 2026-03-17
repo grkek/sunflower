@@ -1,31 +1,11 @@
 import { Canvas, Canvas3D } from "canvas";
 
 // ═══════════════════════════════════════════════════════════════
-//  KeyState — normalizes GTK key case mismatch
-// ═══════════════════════════════════════════════════════════════
-class KeyState {
-  constructor(scene) {
-    this.scene = scene;
-    this.held = {};
-    let self = this;
-    scene.onKeyDown(function (keyName) {
-      self.held[self._n(keyName)] = true;
-    });
-    scene.onKeyUp(function (keyName) {
-      delete self.held[self._n(keyName)];
-    });
-  }
-  _n(k) { return k.length === 1 ? k.toLowerCase() : k; }
-  isDown(key) { return this.held[this._n(key)] === true; }
-}
-
-// ═══════════════════════════════════════════════════════════════
 //  FirstPersonController
 // ═══════════════════════════════════════════════════════════════
 class FirstPersonController {
-  constructor(scene, keys, opts) {
+  constructor(scene, opts) {
     this.scene = scene;
-    this.keys = keys;
     this.x = opts.x || 0;
     this.z = opts.z || 0;
     this.eyeHeight = opts.eyeHeight || 1.7;
@@ -100,6 +80,12 @@ class FirstPersonController {
     this._airFriction = opts.airFriction || 2.0;
     this._airControl = opts.airControl || 0.3;
     this._acceleration = opts.acceleration || 40.0;
+
+    let self = this;
+
+    this.keys = {
+      isDown: function(key) { return self.scene.isKeyDown(key); }
+    };
 
     this._bindInput();
   }
@@ -198,7 +184,7 @@ class FirstPersonController {
 
     // Sprint / crouch
     this.sprinting = k.isDown("Shift_L") || k.isDown("Shift_R");
-    this.crouching = k.isDown("Control_L") || k.isDown("Control_R") || k.isDown("c");
+    this.crouching = k.isDown("Control_L") || k.isDown("Control_R") || k.isDown("C");
     let targetEye = this.crouching ? this.crouchHeight : this.standHeight;
     this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 12);
     let maxSpeed = this.moveSpeed * (this.sprinting ? this.sprintMultiplier : 1.0);
@@ -208,10 +194,10 @@ class FirstPersonController {
     let fX = Math.cos(this.yaw), fZ = Math.sin(this.yaw);
     let rX = Math.cos(this.yaw + Math.PI / 2), rZ = Math.sin(this.yaw + Math.PI / 2);
     let wX = 0, wZ = 0;
-    if (k.isDown("w")) { wX += fX; wZ += fZ; }
-    if (k.isDown("s")) { wX -= fX; wZ -= fZ; }
-    if (k.isDown("a")) { wX -= rX; wZ -= rZ; }
-    if (k.isDown("d")) { wX += rX; wZ += rZ; }
+    if (k.isDown("W")) { wX += fX; wZ += fZ; }
+    if (k.isDown("S")) { wX -= fX; wZ -= fZ; }
+    if (k.isDown("A")) { wX -= rX; wZ -= rZ; }
+    if (k.isDown("D")) { wX += rX; wZ += rZ; }
     let wLen = Math.sqrt(wX * wX + wZ * wZ);
     if (wLen > 0.001) { wX /= wLen; wZ /= wLen; }
 
@@ -263,7 +249,7 @@ class FirstPersonController {
 
     // Jump
     if (this.onGround) this.groundTimer = this.coyoteTime; else this.groundTimer -= dt;
-    if (k.isDown("space")) this.jumpBufferTimer = this.jumpBuffer; else this.jumpBufferTimer -= dt;
+    if (k.isDown("Space")) this.jumpBufferTimer = this.jumpBuffer; else this.jumpBufferTimer -= dt;
     if (this.jumpBufferTimer > 0 && this.groundTimer > 0) {
       this.velY = this.jumpForce; this.onGround = false;
       this.groundTimer = 0; this.jumpBufferTimer = 0; this.fallStartY = this.y;
@@ -653,7 +639,7 @@ function loadGun(scene) {
 // ═══════════════════════════════════════════════════════════════
 //  HUD — hex colors only
 // ═══════════════════════════════════════════════════════════════
-function drawHUD(ctx, scene, player, gunStatus) {
+function drawHUD(context, scene, player, gunStatus) {
   let w = scene.getWidth();
   let h = scene.getHeight();
   let cx = w / 2;
@@ -663,17 +649,17 @@ function drawHUD(ctx, scene, player, gunStatus) {
   let inner = spread;
   let outer = inner + 6;
 
-  ctx.drawLine(cx - outer, cy + 1, cx - inner, cy + 1, "#00000066", 2);
-  ctx.drawLine(cx + inner, cy + 1, cx + outer, cy + 1, "#00000066", 2);
-  ctx.drawLine(cx + 1, cy - outer, cx + 1, cy - inner, "#00000066", 2);
-  ctx.drawLine(cx + 1, cy + inner, cx + 1, cy + outer, "#00000066", 2);
+  context.drawLine(cx - outer, cy + 1, cx - inner, cy + 1, "#00000066", 2);
+  context.drawLine(cx + inner, cy + 1, cx + outer, cy + 1, "#00000066", 2);
+  context.drawLine(cx + 1, cy - outer, cx + 1, cy - inner, "#00000066", 2);
+  context.drawLine(cx + 1, cy + inner, cx + 1, cy + outer, "#00000066", 2);
 
-  ctx.drawLine(cx - outer, cy, cx - inner, cy, "#ccddbb", 1.5);
-  ctx.drawLine(cx + inner, cy, cx + outer, cy, "#ccddbb", 1.5);
-  ctx.drawLine(cx, cy - outer, cx, cy - inner, "#ccddbb", 1.5);
-  ctx.drawLine(cx, cy + inner, cx, cy + outer, "#ccddbb", 1.5);
+  context.drawLine(cx - outer, cy, cx - inner, cy, "#ccddbb", 1.5);
+  context.drawLine(cx + inner, cy, cx + outer, cy, "#ccddbb", 1.5);
+  context.drawLine(cx, cy - outer, cx, cy - inner, "#ccddbb", 1.5);
+  context.drawLine(cx, cy + inner, cx, cy + outer, "#ccddbb", 1.5);
 
-  ctx.fillCircle(cx, cy, 1.2, "#ffffffcc");
+  context.fillCircle(cx, cy, 1.2, "#ffffffcc");
 
   let status = player.getStatus();
   let statusColors = {
@@ -690,25 +676,25 @@ function drawHUD(ctx, scene, player, gunStatus) {
   let barW = 130, barH = 20;
   let barX = cx - barW / 2;
   let barY = h - 56;
-  ctx.fillRect(barX, barY, barW, barH, "#0000004d");
-  ctx.fillText(sLabel, barX + 10, barY + 14, sCol, 12);
+  context.fillRect(barX, barY, barW, barH, "#0000004d");
+  context.fillText(sLabel, barX + 10, barY + 14, sCol, 12);
 
   let speedMax = player.moveSpeed * player.sprintMultiplier;
   let speedRatio = Math.min(player._groundSpeed / speedMax, 1.0);
   let sBarW = barW - 8;
   let sBarY = barY + barH + 3;
-  ctx.fillRect(barX + 4, sBarY, sBarW, 3, "#00000040");
+  context.fillRect(barX + 4, sBarY, sBarW, 3, "#00000040");
   if (speedRatio > 0.01) {
-    ctx.fillRect(barX + 4, sBarY, sBarW * speedRatio, 3, sCol);
+    context.fillRect(barX + 4, sBarY, sBarW * speedRatio, 3, sCol);
   }
 
-  ctx.fillText("WASD move | Mouse look | Space jump | Shift sprint", 12, 18, "#aabbcc99", 10);
+  context.fillText("WASD move | Mouse look | Space jump | Shift_L sprint", 12, 18, "#aabbcc99", 10);
 
   if (gunStatus) {
     let isLoaded = gunStatus.indexOf("loaded") >= 0;
     let gCol = isLoaded ? "#88ff88b3" : "#ffaa64b3";
     let textW = gunStatus.length * 6;
-    ctx.fillText(gunStatus, w - textW - 14, 18, gCol, 10);
+    context.fillText(gunStatus, w - textW - 14, 18, gCol, 10);
   }
 
   let stats = scene.getStats();
@@ -716,13 +702,13 @@ function drawHUD(ctx, scene, player, gunStatus) {
   let fpsCol = "#66778899";
   if (fps < 50) fpsCol = "#ccaa3299";
   if (fps < 30) fpsCol = "#cc5050b3";
-  ctx.fillText(fps + " fps", 12, h - 28, fpsCol, 10);
-  ctx.fillText(stats.triangles + " tris", 12, h - 14, "#66778873", 9);
+  context.fillText(fps + " fps", 12, h - 28, fpsCol, 10);
+  context.fillText(stats.triangles + " tris", 12, h - 14, "#66778873", 9);
 
   let pos = player.getPosition();
   let posStr = pos.x.toFixed(1) + ", " + pos.y.toFixed(1) + ", " + pos.z.toFixed(1);
   let posW = posStr.length * 5.5;
-  ctx.fillText(posStr, w - posW - 14, h - 14, "#66778873", 9);
+  context.fillText(posStr, w - posW - 14, h - 14, "#66778873", 9);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -731,9 +717,8 @@ function drawHUD(ctx, scene, player, gunStatus) {
 function Game() {
   useEffect(function () {
     let scene = new Canvas3D("viewport", { width: 800, height: 600, framesPerSecond: 60 });
-    let keys = new KeyState(scene);
 
-    let player = new FirstPersonController(scene, keys, {
+    let player = new FirstPersonController(scene, {
       x: 0, z: 5, eyeHeight: 1.7, yaw: -Math.PI / 2,
       moveSpeed: 5.0, sprintMultiplier: 1.8,
       acceleration: 40.0, friction: 12.0,
@@ -774,8 +759,8 @@ function Game() {
       gun.update(dt);
     });
 
-    scene.onDraw(function (ctx) {
-      drawHUD(ctx, scene, player, gunStatus);
+    scene.onDraw(function (context) {
+      drawHUD(context, scene, player, gunStatus);
     });
 
     scene.start();

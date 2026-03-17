@@ -52,12 +52,14 @@ module Sunflower
 
         struct ClearCommand < DrawCommand
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
+
           def initialize(@r, @g, @b, @a); end
         end
 
         struct FillRectCommand < DrawCommand
           getter x : Float64; getter y : Float64; getter w : Float64; getter h : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
+
           def initialize(@x, @y, @w, @h, @r, @g, @b, @a); end
         end
 
@@ -65,12 +67,14 @@ module Sunflower
           getter x : Float64; getter y : Float64; getter w : Float64; getter h : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
+
           def initialize(@x, @y, @w, @h, @r, @g, @b, @a, @line_width); end
         end
 
         struct FillCircleCommand < DrawCommand
           getter x : Float64; getter y : Float64; getter radius : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
+
           def initialize(@x, @y, @radius, @r, @g, @b, @a); end
         end
 
@@ -78,6 +82,7 @@ module Sunflower
           getter x : Float64; getter y : Float64; getter radius : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
+
           def initialize(@x, @y, @radius, @r, @g, @b, @a, @line_width); end
         end
 
@@ -85,6 +90,7 @@ module Sunflower
           getter x1 : Float64; getter y1 : Float64; getter x2 : Float64; getter y2 : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter line_width : Float64
+
           def initialize(@x1, @y1, @x2, @y2, @r, @g, @b, @a, @line_width); end
         end
 
@@ -92,6 +98,7 @@ module Sunflower
           getter text : String; getter x : Float64; getter y : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
           getter size : Float64
+
           def initialize(@text, @x, @y, @r, @g, @b, @a, @size); end
         end
 
@@ -99,6 +106,7 @@ module Sunflower
           getter x1 : Float64; getter y1 : Float64; getter x2 : Float64; getter y2 : Float64
           getter x3 : Float64; getter y3 : Float64
           getter r : Float64; getter g : Float64; getter b : Float64; getter a : Float64
+
           def initialize(@x1, @y1, @x2, @y2, @x3, @y3, @r, @g, @b, @a); end
         end
 
@@ -1060,9 +1068,9 @@ module Sunflower
               onMouseMove(cb) { __canvasCallbacks[this.id].onMouseMove = cb; }
 
               isKeyDown(key)  { return __canvas_isKeyDown(this.id, key); }
+              isMouseDown()   { return __canvas_isMouseDown(this.id); }
               mouseX()        { return __canvas_getMouseX(this.id); }
               mouseY()        { return __canvas_getMouseY(this.id); }
-              isMouseDown()   { return __canvas_isMouseDown(this.id); }
               getWidth()      { return __canvas_getWidth(this.id); }
               getHeight()     { return __canvas_getHeight(this.id); }
 
@@ -1119,14 +1127,14 @@ module Sunflower
 
           state.draw_commands.each do |cmd|
             case cmd
-            when ClearCommand      then renderer.clear(cmd.r.to_f32, cmd.g.to_f32, cmd.b.to_f32, cmd.a.to_f32)
-            when FillRectCommand   then renderer.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
-            when StrokeRectCommand then renderer.stroke_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
-            when FillCircleCommand then renderer.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
+            when ClearCommand        then renderer.clear(cmd.r.to_f32, cmd.g.to_f32, cmd.b.to_f32, cmd.a.to_f32)
+            when FillRectCommand     then renderer.fill_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a)
+            when StrokeRectCommand   then renderer.stroke_rect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+            when FillCircleCommand   then renderer.fill_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a)
             when StrokeCircleCommand then renderer.stroke_circle(cmd.x, cmd.y, cmd.radius, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
-            when DrawLineCommand   then renderer.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
+            when DrawLineCommand     then renderer.draw_line(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.r, cmd.g, cmd.b, cmd.a, cmd.line_width)
             when FillTriangleCommand then renderer.fill_triangle(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3, cmd.r, cmd.g, cmd.b, cmd.a)
-            when FillTextCommand   then state.text_renderer.render(renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
+            when FillTextCommand     then state.text_renderer.render(renderer, cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, cmd.size)
             end
           end
 
@@ -1167,10 +1175,19 @@ module Sunflower
 
         private def self.attach_input_controllers(id : String, gl_area : Gtk::GLArea) : Nil
           key_controller = Gtk::EventControllerKey.new
+
           key_controller.key_pressed_signal.connect do |key_val, _, _|
             canvas = State.get(id)
+
             key_name = Gdk.keyval_name(key_val) || key_val.to_s
+            if key_name.size == 1
+              key_name = key_name.upcase
+            elsif key_name.size > 1
+              key_name = key_name[0].upcase.to_s + key_name[1..]
+            end
+
             canvas.keys_held.add(key_name)
+
             begin
               Engine.instance.sandbox.eval_mutex!(
                 "if (__canvasCallbacks['#{id}'] && __canvasCallbacks['#{id}'].onKeyDown) {\n" \
@@ -1181,10 +1198,19 @@ module Sunflower
             end
             true
           end
+
           key_controller.key_released_signal.connect do |key_val, _, _|
             canvas = State.get(id)
+
             key_name = Gdk.keyval_name(key_val) || key_val.to_s
+            if key_name.size == 1
+              key_name = key_name.upcase
+            elsif key_name.size > 1
+              key_name = key_name[0].upcase.to_s + key_name[1..]
+            end
+
             canvas.keys_held.delete(key_name)
+
             begin
               Engine.instance.sandbox.eval_mutex!(
                 "if (__canvasCallbacks['#{id}'] && __canvasCallbacks['#{id}'].onKeyUp) {\n" \
@@ -1194,13 +1220,17 @@ module Sunflower
             rescue
             end
           end
+
           gl_area.add_controller(key_controller)
 
           motion = Gtk::EventControllerMotion.new
+
           motion.motion_signal.connect do |x, y|
             canvas = State.get(id)
+
             canvas.mouse_x = x
             canvas.mouse_y = y
+
             begin
               Engine.instance.sandbox.eval_mutex!(
                 "if (__canvasCallbacks['#{id}'] && __canvasCallbacks['#{id}'].onMouseMove) {\n" \
@@ -1210,13 +1240,17 @@ module Sunflower
             rescue
             end
           end
+
           gl_area.add_controller(motion)
 
           click = Gtk::GestureClick.new
+
           click.pressed_signal.connect do |_, x, y|
             canvas = State.get(id)
+
             canvas.mouse_down = true
             gl_area.grab_focus
+
             begin
               Engine.instance.sandbox.eval_mutex!(
                 "if (__canvasCallbacks['#{id}'] && __canvasCallbacks['#{id}'].onMouseDown) {\n" \
@@ -1226,8 +1260,10 @@ module Sunflower
             rescue
             end
           end
+
           click.released_signal.connect do |_, x, y|
             State.get(id).mouse_down = false
+
             begin
               Engine.instance.sandbox.eval_mutex!(
                 "if (__canvasCallbacks['#{id}'] && __canvasCallbacks['#{id}'].onMouseUp) {\n" \
@@ -1237,6 +1273,7 @@ module Sunflower
             rescue
             end
           end
+
           gl_area.add_controller(click)
         end
       end
