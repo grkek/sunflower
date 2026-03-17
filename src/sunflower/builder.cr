@@ -9,9 +9,6 @@ module Sunflower
     @application : Gtk::Application? = nil
     @window : Gtk::ApplicationWindow? = nil
 
-    def initialize
-    end
-
     def build_from_file(file_path : String) : Nil
       Log.info { "Loading file: #{file_path}" }
 
@@ -39,8 +36,6 @@ module Sunflower
 
       application_id = root.as(Generic).attributes["applicationId"]?.try(&.to_s) ||
                        "com.sunflower.untitled"
-
-      Log.info { "Application ID: #{application_id}" }
 
       application = Gtk::Application.new(application_id: application_id)
 

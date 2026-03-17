@@ -22,7 +22,7 @@ module Sunflower
 
       # Set up default (no-op) event handlers on the `on` object.
       # User scripts override these:
-      #   $.findComponentById("myButton").on.press = function() { ... }
+      #   Stigma.findComponentById("myButton").on.press = function() { ... }
       sandbox = JavaScript::Engine.instance.sandbox
       sandbox.eval_mutex!(
         "Object.assign(#{component.path}.on, {\n" \
@@ -86,10 +86,7 @@ module Sunflower
       JSON.parse({"id" => value.to_i, "name" => value.to_s}.to_json)
     end
 
-    # -------------------------------------------------------------------------
     # State collectors — build a plain Hash, return it as JSON string
-    # -------------------------------------------------------------------------
-
     private def collect_widget_state(widget : Gtk::Widget, state : Hash(String, JSON::Any)) : Nil
       state["horizontalAlignment"] = self.class.enum_json(widget.halign)
       state["verticalAlignment"] = self.class.enum_json(widget.valign)

@@ -68,6 +68,7 @@ module Sunflower
           if path.ends_with?(".jsx")
             source = File.read(resolved)
             transpiled = JavaScript::XML::Transpiler.transform(source)
+
             is_module = engine.sandbox.engine.context.detect_module?(transpiled)
             flag = is_module ? Medusa::Binding::QuickJS::EvalFlag::MODULE : Medusa::Binding::QuickJS::EvalFlag::STRICT
             engine.sandbox.eval_mutex!(transpiled, flag: flag, tag: resolved)

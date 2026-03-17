@@ -14,9 +14,9 @@ module Sunflower
       register_js_object
     end
 
-    # The full JS path: $.windows["windowId"].components["id"]
+    # The full JS path: __runtime.windows["windowId"].components["id"]
     def path : String
-      "$.windows[\"#{window_id}\"].components[\"#{id}\"]"
+      "__runtime.windows[\"#{window_id}\"].components[\"#{id}\"]"
     end
 
     # Called from Crystal to dispatch a GTK event to JS handlers.
@@ -37,7 +37,7 @@ module Sunflower
     # -------------------------------------------------------------------------
     # JS Object Registration
     #
-    # Creates a component at $.windows[windowId].components[id]:
+    # Creates a component at Stigma.windows[windowId].components[id]:
     # {
     #   isMounted: true,
     #   id: "...",

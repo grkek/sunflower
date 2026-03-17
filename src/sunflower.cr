@@ -1,13 +1,13 @@
+require "colorize"
+require "http/client"
 require "json"
-require "uuid"
+require "levenshtein"
 require "log"
 require "socket"
-require "colorize"
-require "levenshtein"
-require "http/client"
+require "uuid"
 
-require "medusa"
 require "gtk4"
+require "medusa"
 require "petal"
 
 require "./sunflower/helpers/**"

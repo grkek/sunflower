@@ -1,4 +1,5 @@
 import { Canvas } from "canvas";
+import Stigma, { useState, useEffect } from "stigma";
 
 function PongGame() {
   let scores = useState([0, 0]);
@@ -148,6 +149,6 @@ function App() {
   return <PongGame />;
 }
 
-$.onReady(function() {
-  $.render("root", App);
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });

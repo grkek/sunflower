@@ -39,12 +39,20 @@ module Sunflower
           next_char = @source[@pos + 1]
 
           # <Uppercase = JSX element
-          # </Uppercase = JSX closing tag (handled inside transpile_jsx)
-          next_char.uppercase?
+          # <> = Fragment shorthand
+          next_char.uppercase? || next_char == '>'
         end
 
         private def transpile_jsx : Nil
-          advance # skip <
+          advance # skip
+
+          # Fragment shorthand: <>...</>
+          if current == '>'
+            advance # skip >
+            children = read_fragment_children
+            emit_create_element("Fragment", [] of {String, String}, children)
+            return
+          end
 
           # Self-closing or opening tag
           tag = read_tag_name
@@ -59,14 +67,14 @@ module Sunflower
             # Self-closing: <Tag ... />
             advance # /
             advance # >
-            emit_h(tag, props, nil)
+            emit_create_element(tag, props, nil)
           elsif current == '>'
             # Opening tag: <Tag ...>children</Tag>
             advance # >
 
             children = read_children(tag)
 
-            emit_h(tag, props, children)
+            emit_create_element(tag, props, children)
           end
         end
 
@@ -76,6 +84,42 @@ module Sunflower
             advance
           end
           @source[start...@pos]
+        end
+
+        private def read_fragment_children : Array(String)
+          children = [] of String
+
+          loop do
+            break if @pos >= @source.size
+
+            # Check for </>
+            if looking_at?("</>")
+              advance #
+              advance # /
+              advance # >
+              break
+            end
+
+            if looking_at_jsx?
+              child_output = IO::Memory.new
+              old_output = @output
+              @output = child_output
+              transpile_jsx
+              @output = old_output
+              children << child_output.to_s
+            elsif current == '{'
+              expr = read_expression_value
+              children << expr unless expr.empty?
+            else
+              text = read_text_content
+              unless text.strip.empty?
+                escaped = text.strip.gsub("\\", "\\\\").gsub("\"", "\\\"").gsub("\n", "\\n")
+                children << "\"#{escaped}\""
+              end
+            end
+          end
+
+          children
         end
 
         private def read_props : Array({String, String})
@@ -261,8 +305,8 @@ module Sunflower
           @source[start...@pos]
         end
 
-        # Emit: h("Tag", { key: value, ... }, child1, child2)
-        private def emit_h(tag : String, props : Array({String, String}), children : Array(String)?) : Nil
+        # Emit: Stigma.createElement("Tag", { key: value, ... }, child1, child2)
+        private def emit_create_element(tag : String, props : Array({String, String}), children : Array(String)?) : Nil
           # Known native GTK widgets get quoted strings, everything else is a component reference
           native_widgets = %w[
             Box Label Button Entry Image Frame Tab ListBox ScrolledWindow
@@ -271,9 +315,9 @@ module Sunflower
           ]
 
           if native_widgets.includes?(tag)
-            @output << "h(\"#{tag}\""
+            @output << "Stigma.createElement(\"#{tag}\""
           else
-            @output << "h(#{tag}"
+            @output << "Stigma.createElement(#{tag}"
           end
 
           # Props

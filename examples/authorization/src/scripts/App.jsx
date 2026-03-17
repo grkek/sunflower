@@ -1,4 +1,5 @@
 import { post } from "http";
+import Stigma, { useState } from "stigma";
 
 function LoginPage({ onLogin, onNavigate }) {
   const [username, setUsername] = useState("");
@@ -134,6 +135,6 @@ function App() {
 }
 
 // Mount the app
-$.onReady(function() {
-  $.render("root", App);
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });

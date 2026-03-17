@@ -44,7 +44,6 @@ my-application/
         └── App.jsx
 └── src/
   └── application.cr
-
 ```
 
 **`application.cr`** — your entry point:
@@ -72,8 +71,11 @@ builder.build_from_file(File.join(__DIR__, "..", "dist", "index.html"))
 </Application>
 ```
 
-**`src/scripts/App.jsx`** - your App:
+**`src/scripts/App.jsx`** — your App:
+
 ```jsx
+import Stigma, { useState } from "stigma";
+
 function App() {
   const [count, setCount] = useState(0);
 
@@ -87,8 +89,8 @@ function App() {
   );
 }
 
-$.onReady(function() {
-  $.render("root", App);
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });
 ```
 
@@ -98,13 +100,13 @@ Run it:
 GTK_DEBUG=interactive crystal run ./src/application.cr -Dpreview_mt
 ```
 
-## Two Modes
+## Three Modes
 
-Sunflower supports two development styles:
+Sunflower supports three development styles:
 
 ### 1. Markup Mode
 
-Define your UI in XML with inline or external scripts. Best for simpler apps or when you want a clear separation between structure and logic.
+Define your UI in XML with inline or external scripts. Best for simpler apps or when you want a clear separation between structure and logic. In markup mode, components are accessed through the `__runtime` global which is available without any imports.
 
 ```xml
 <Application applicationId="com.example.app">
@@ -119,9 +121,56 @@ Define your UI in XML with inline or external scripts. Best for simpler apps or 
 </Application>
 ```
 
-### 2. JSX Mode
+```javascript
+// scripts/index.js — markup mode, no imports needed
+__runtime.onReady(function() {
+  var btn = __runtime.getComponentById("btn");
+  btn.on.press = function() {
+    __runtime.getComponentById("title").setText("Clicked!");
+  };
+});
+```
 
-Define your UI as composable function components with `useState`, `useEffect`, and a virtual DOM reconciler. The markup becomes a minimal shell.
+### 2. Component Mode (no JSX)
+
+Use the full Stigma runtime — hooks, virtual DOM, reconciler — without JSX syntax. Write `createElement` calls directly in plain `.js` files. Same power as JSX mode, just without the syntactic sugar.
+
+**`src/index.html`**:
+
+```xml
+<Application applicationId="com.example.app">
+  <StyleSheet src="styles/index.css" />
+  <Window title="My App" width="800" height="600">
+    <Box id="root" orientation="vertical" expand="true" />
+  </Window>
+  <Script src="scripts/App.js" />
+</Application>
+```
+
+**`scripts/App.js`**:
+
+```javascript
+import Stigma, { createElement, useState } from "stigma";
+
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  return createElement("Box", { orientation: "vertical", spacing: "12" },
+    createElement("Label", { className: "title" }, "Count: " + count),
+    createElement("Button", { onPress: function() { setCount(count + 1); } }, "Increment")
+  );
+}
+
+Stigma.onReady(function() {
+  Stigma.render("root", Counter);
+});
+```
+
+This is useful when you prefer not to use JSX, want to avoid the transpiler, or are generating UI programmatically.
+
+### 3. JSX Mode
+
+Define your UI as composable function components with JSX syntax. This is syntactic sugar over Component Mode — the built-in transpiler converts JSX to `createElement` calls automatically.
 
 **`src/index.html`**:
 
@@ -138,6 +187,8 @@ Define your UI as composable function components with `useState`, `useEffect`, a
 **`scripts/App.jsx`**:
 
 ```jsx
+import Stigma, { useState } from "stigma";
+
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -151,12 +202,12 @@ function Counter() {
   );
 }
 
-$.onReady(function() {
-  $.render("root", Counter);
+Stigma.onReady(function() {
+  Stigma.render("root", Counter);
 });
 ```
 
-The JSX transpiler runs automatically for `.jsx` files — no build step required.
+The JSX transpiler runs automatically for `.jsx` files — no build step required. Under the hood, the JSX above compiles to the same `createElement` calls shown in Component Mode.
 
 ## Architecture
 
@@ -171,6 +222,11 @@ The JSX transpiler runs automatically for `.jsx` files — no build step require
 ```
 
 The Crystal bridge connects GTK4 widgets to JavaScript objects. Every widget gets a corresponding JS object with methods and event handlers. Async operations use a promise-based bridge — Crystal spawns a fiber, does the work, and resolves the JS promise when done.
+
+The runtime is split into two layers:
+
+- **`__runtime`** — a lightweight global object that the Crystal bridge writes to. Handles windows, lifecycle callbacks, and component lookups. Always available, no imports needed.
+- **`"stigma"` module** — the full JSX runtime including hooks, virtual DOM, reconciler, and rendering. Loaded lazily on first import — markup-only apps never pay for it.
 
 ## Markup
 
@@ -248,9 +304,10 @@ Style your application with GTK CSS:
 
 ### ES Module Imports
 
-Sunflower's standard library modules are available as ES module imports:
+Sunflower's standard library is available as ES module imports:
 
 ```javascript
+import Stigma, { useState, useEffect } from "stigma";
 import { Canvas } from "canvas";
 import { read, write, exists, mkdir } from "fs";
 import { get, post, download } from "http";
@@ -258,37 +315,72 @@ import { get, post, download } from "http";
 
 The module loader checks built-in modules first, then falls back to loading `.js` files from disk for user modules.
 
-### The `$` Object
+### Import Styles
 
-The global `$` object is your entry point to the application.
+The `"stigma"` module supports multiple import patterns, similar to React:
 
 ```javascript
-// Access the main window
-$.mainWindow;
+// Default import — the full Stigma object
+import Stigma from "stigma";
+Stigma.render("root", App);
+Stigma.useState(0);
+Stigma.onReady(function() { });
 
-// Get a component by ID
-var btn = $.getComponentById("myButton");
+// Named imports — destructured
+import { useState, useEffect, render, onReady } from "stigma";
 
-// Get a component from a specific window
-var label = $.getComponentById("title", "Main");
-
-// List all component IDs
-console.log($.componentIds);
-
-// List all window IDs
-console.log($.windowIds);
+// Both (recommended for JSX)
+import Stigma, { useState, useEffect } from "stigma";
 ```
+
+### Available Imports from `"stigma"`
+
+| Export | Description |
+|---|---|
+| `createElement` | Virtual DOM node constructor (used by JSX transpiler) |
+| `Fragment` | Fragment component for grouping without a wrapper |
+| `useState` | State hook for function components |
+| `useEffect` | Effect hook for side effects |
+| `render` | Mount a component into a container |
+| `onReady` | Register a callback for when the app is ready |
+| `onExit` | Register a callback for when the app exits |
+| `getWindow` | Get a window object by ID |
+| `getComponentById` | Get a component by ID (optionally scoped to a window) |
+| `findComponentById` | Search all windows for a component |
+| `default` | The full `Stigma` object (includes `windows`, `mainWindow`, `windowIds`, `componentIds`) |
+
+### The `__runtime` Object
+
+The `__runtime` global is the internal bridge between Crystal and JavaScript. It's always available without imports and is useful in markup mode scripts:
+
+```javascript
+// Component access
+var btn = __runtime.getComponentById("myButton");
+var label = __runtime.getComponentById("title", "Main");
+
+// Window access
+__runtime.windows["Main"];
+__runtime.getWindow("Main");
+
+// Lifecycle
+__runtime.onReady(function() { });
+__runtime.onExit(function() { });
+```
+
+In JSX mode, prefer importing from `"stigma"` instead of using `__runtime` directly.
 
 ### Event Handlers
 
 Attach handlers through the `on` property:
 
 ```javascript
-$.getComponentById("myButton").on.press = function() {
+import Stigma from "stigma";
+
+Stigma.getComponentById("myButton").on.press = function() {
   console.log("Button pressed!");
 };
 
-$.getComponentById("myEntry").on.change = function(text) {
+Stigma.getComponentById("myEntry").on.change = function(text) {
   console.log("Text changed: " + text);
 };
 ```
@@ -298,14 +390,14 @@ $.getComponentById("myEntry").on.change = function(text) {
 #### Button
 
 ```javascript
-var btn = $.getComponentById("myButton");
+var btn = Stigma.getComponentById("myButton");
 btn.setText("New Label");
 ```
 
 #### Label
 
 ```javascript
-var label = $.getComponentById("myLabel");
+var label = Stigma.getComponentById("myLabel");
 label.setText("Plain text");
 label.setLabel("Text with <b>markup</b>");
 label.getText();
@@ -318,7 +410,7 @@ label.setYAlign(0.5);
 #### Entry
 
 ```javascript
-var entry = $.getComponentById("myEntry");
+var entry = Stigma.getComponentById("myEntry");
 entry.setText("Default value");
 var text = entry.getText();
 entry.isPassword(true);
@@ -327,7 +419,7 @@ entry.isPassword(true);
 #### Image
 
 ```javascript
-var img = $.getComponentById("myImage");
+var img = Stigma.getComponentById("myImage");
 
 // Load from URL (async)
 await img.setResourcePath("https://example.com/photo.jpg");
@@ -342,7 +434,7 @@ img.setContentFit("cover"); // "fill", "contain", "cover", "none"
 #### Box
 
 ```javascript
-var box = $.getComponentById("myBox");
+var box = Stigma.getComponentById("myBox");
 box.append("childComponentId");
 box.destroyChildren();
 ```
@@ -350,14 +442,16 @@ box.destroyChildren();
 #### ListBox
 
 ```javascript
-var list = $.getComponentById("myList");
+var list = Stigma.getComponentById("myList");
 list.removeAll();
 ```
 
 #### Window
 
 ```javascript
-var win = $.mainWindow;
+import Stigma from "stigma";
+
+var win = Stigma.mainWindow;
 win.setTitle("New Title");
 win.maximize();
 win.minimize();
@@ -368,7 +462,7 @@ win.minimize();
 Available on all components:
 
 ```javascript
-var comp = $.getComponentById("any");
+var comp = Stigma.getComponentById("any");
 comp.setVisible(false);
 comp.addCssClass("highlighted");
 comp.removeCssClass("highlighted");
@@ -379,20 +473,22 @@ comp.removeCssClass("highlighted");
 Every component has a lazy `state` getter that reads the current widget state from GTK:
 
 ```javascript
-var btn = $.getComponentById("myButton");
+var btn = Stigma.getComponentById("myButton");
 console.log(btn.state);
 ```
 
 ### Lifecycle
 
 ```javascript
+import Stigma from "stigma";
+
 // Run code when the application is ready (all components mounted)
-$.onReady(function() {
+Stigma.onReady(function() {
   console.log("I am ready!");
 });
 
 // Run code on exit (supports multiple callbacks)
-$.onExit(function() {
+Stigma.onExit(function() {
   console.log("Goodbye!");
 });
 ```
@@ -402,7 +498,9 @@ $.onExit(function() {
 Sunflower has full async/await support. Any Crystal binding that does I/O returns a JS Promise that you can `await`:
 
 ```javascript
-$.onReady(async function() {
+import Stigma from "stigma";
+
+Stigma.onReady(async function() {
   await img.setResourcePath("https://example.com/photo.jpg");
   console.log("Image loaded!");
 });
@@ -426,9 +524,11 @@ Create a minimal HTML shell with a root container, then write your UI in `.jsx` 
 
 ### Function Components
 
-Components are plain functions that return JSX:
+Components are plain functions that return JSX. JSX files must import from `"stigma"` — the transpiler converts JSX syntax to `createElement()` calls:
 
 ```jsx
+import Stigma from "stigma";
+
 function Greeting({ name }) {
   return (
     <Box orientation="vertical">
@@ -443,6 +543,8 @@ function Greeting({ name }) {
 Manage component state with `useState`:
 
 ```jsx
+import Stigma, { useState } from "stigma";
+
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -461,6 +563,8 @@ function Counter() {
 Run side effects after render:
 
 ```jsx
+import Stigma, { useState, useEffect } from "stigma";
+
 function Timer() {
   const [seconds, setSeconds] = useState(0);
 
@@ -480,6 +584,8 @@ function Timer() {
 Nest components and pass props:
 
 ```jsx
+import Stigma from "stigma";
+
 function UserCard({ name, email }) {
   return (
     <Box orientation="vertical" className="card">
@@ -498,14 +604,16 @@ function App() {
   );
 }
 
-$.onReady(function() {
-  $.render("root", App);
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });
 ```
 
 ### Conditional Rendering
 
 ```jsx
+import Stigma, { useState } from "stigma";
+
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
 
@@ -528,13 +636,33 @@ function App() {
 <Entry onChange={function(text) { setQuery(text); }} />
 ```
 
+### Fragments
+
+Group elements without adding a wrapper widget:
+
+```jsx
+// Named tag
+<Fragment>
+  <Label>First</Label>
+  <Label>Second</Label>
+</Fragment>
+
+// Shorthand syntax
+<>
+  <Label>First</Label>
+  <Label>Second</Label>
+</>
+```
+
 ### Mounting
 
 Mount your root component into a container defined in the HTML:
 
-```javascript
-$.onReady(function() {
-  $.render("root", App);
+```jsx
+import Stigma from "stigma";
+
+Stigma.onReady(function() {
+  Stigma.render("root", App);
 });
 ```
 
@@ -548,6 +676,7 @@ Add a `<Canvas>` element to your JSX layout and import the `Canvas` class:
 
 ```jsx
 import { Canvas } from "canvas";
+import { useEffect } from "stigma";
 
 function MyGame() {
   useEffect(function() {
@@ -708,6 +837,35 @@ canvas.onDraw(function(context) {
 
 Sunflower's standard library is available as ES module imports.
 
+### `stigma` — Runtime & Hooks
+
+The Stigma module is the JSX runtime. It loads lazily on first import — markup-only apps never pay for the reconciler, hooks, or virtual DOM overhead.
+
+```javascript
+import Stigma, { useState, useEffect } from "stigma";
+
+// State management
+const [value, setValue] = useState(initialValue);
+
+// Side effects
+useEffect(function() {
+  // setup
+  return function() { /* cleanup */ };
+}, [dependencies]);
+
+// Mount a component
+Stigma.render("containerId", MyComponent);
+
+// Lifecycle
+Stigma.onReady(function() { /* app is ready */ });
+Stigma.onExit(function() { /* app is closing */ });
+
+// Window & component access
+Stigma.mainWindow;
+Stigma.getComponentById("myButton");
+Stigma.windows;
+```
+
 ### `fs` — File System
 
 ```javascript
@@ -811,16 +969,6 @@ if (content.error) {
 }
 ```
 
-### Legacy `$` API
-
-The standard library modules are also available on the global `$` object for backward compatibility:
-
-```javascript
-// These still work
-await $.fs.read("/path/to/file.txt");
-await $.http.get("https://example.com");
-```
-
 ## Console
 
 Standard `console` methods are available:
@@ -848,7 +996,7 @@ Sunflower exposes a UNIX socket for inter-process communication. External proces
   "directory": "/path/to/project",
   "file": "src/index.html",
   "line": 1,
-  "sourceCode": "$.getComponentById('title').setText('Updated from IPC!')"
+  "sourceCode": "__runtime.getComponentById('title').setText('Updated from IPC!')"
 }
 ```
 
@@ -863,13 +1011,21 @@ Sunflower exposes a UNIX socket for inter-process communication. External proces
 ### Example
 
 ```bash
-echo '{"id":"1","directory":".","file":"repl","line":1,"sourceCode":"console.log($.componentIds)"}' \
+echo '{"id":"1","directory":".","file":"repl","line":1,"sourceCode":"console.log(__runtime.componentIds)"}' \
   | socat - UNIX-CONNECT:/tmp/<socket-id>.sock
 ```
 
-The socket path is logged on startup.
+The socket path is logged on startup. IPC evaluates code in the global scope, so use `__runtime` for component and window access.
 
 ## How It Works
+
+### The Two-Layer Runtime
+
+Sunflower's JavaScript runtime is split into two layers:
+
+- **`__runtime`** (global) — The Crystal bridge target. A lightweight object created eagerly at startup that holds the window registry, lifecycle callbacks, and component lookup functions. Crystal writes directly into `__runtime.windows`, calls `__runtime.flushReady()`, and binds window methods here. This is always available, even in markup-only apps.
+
+- **`"stigma"` module** (lazy) — The full JSX runtime including `createElement`, hooks (`useState`, `useEffect`), the virtual DOM reconciler, and the `render` function. This module is only loaded when user code writes `import ... from "stigma"`. Markup-only apps that never import it pay zero cost for the reconciler.
 
 ### The Promise Bridge
 
@@ -886,7 +1042,7 @@ This gives you true non-blocking async in JS while all heavy lifting happens in 
 
 ### The Module Loader
 
-Sunflower uses a custom ES module loader that integrates with QuickJS's native `import`/`export` system. When you write `import { Canvas } from "canvas"`, QuickJS calls into a C++ bridge that checks Sunflower's built-in module registry first. If the module isn't registered, it falls back to loading `.js` files from disk with path resolution relative to the importing file.
+Sunflower uses a custom ES module loader that integrates with QuickJS's native `import`/`export` system. When you write `import { useState } from "stigma"`, QuickJS calls into a C++ bridge that checks Sunflower's built-in module registry first. If the module isn't registered, it falls back to loading `.js` files from disk with path resolution relative to the importing file.
 
 Built-in modules register their JavaScript source at startup. The source uses standard ES module syntax (`export class`, `export function`) and calls into native Crystal bindings under the hood.
 
@@ -902,7 +1058,7 @@ This is the heartbeat that keeps async flowing between Crystal and JS without bl
 
 ### The JSX Transpiler
 
-When a `.jsx` file is loaded, Sunflower's built-in transpiler converts JSX syntax to `h()` function calls before passing the code to QuickJS. No external build tools needed.
+When a `.jsx` file is loaded, Sunflower's built-in transpiler converts JSX syntax to `createElement()` calls before passing the code to QuickJS. No external build tools needed.
 
 ```jsx
 // Input
@@ -911,16 +1067,20 @@ When a `.jsx` file is loaded, Sunflower's built-in transpiler converts JSX synta
 </Box>
 
 // Output
-h("Box", { orientation: "vertical" },
-  h("Label", { className: "title" }, "Hello")
+Stigma.createElement("Box", { orientation: "vertical" },
+  Stigma.createElement("Label", { className: "title" }, "Hello")
 )
 ```
 
-Custom components (uppercase names not matching built-in widgets) are emitted as function references: `<MyComponent />` becomes `h(MyComponent, null)`.
+The transpiled `Stigma.createElement` references resolve through the user's `import Stigma from "stigma"` — the transpiler only handles syntax transformation, not imports.
+
+Custom components (uppercase names not matching built-in widgets) are emitted as function references: `<MyComponent />` becomes `Stigma.createElement(MyComponent, null)`.
+
+Fragment shorthand `<>...</>` is transpiled to `Stigma.createElement(Fragment, null, ...)`.
 
 ### The Reconciler
 
-In JSX mode, the Seed runtime includes a virtual DOM reconciler that diffs old and new component trees. When state changes:
+In JSX mode, the Stigma module includes a virtual DOM reconciler that diffs old and new component trees. When state changes:
 
 1. The component function re-runs, producing a new virtual DOM tree
 2. The reconciler walks old and new trees side by side
