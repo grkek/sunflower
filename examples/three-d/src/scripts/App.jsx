@@ -85,10 +85,10 @@ class FirstPersonController {
     let rightZ = Math.sin(this.yaw + Math.PI / 2);
 
     let mx = 0, mz = 0;
-    if (s.isKeyDown("w")) { mx += flatX * speed; mz += flatZ * speed; }
-    if (s.isKeyDown("s")) { mx -= flatX * speed; mz -= flatZ * speed; }
-    if (s.isKeyDown("a")) { mx -= rightX * speed; mz -= rightZ * speed; }
-    if (s.isKeyDown("d")) { mx += rightX * speed; mz += rightZ * speed; }
+    if (s.isKeyDown("W")) { mx += flatX * speed; mz += flatZ * speed; }
+    if (s.isKeyDown("S")) { mx -= flatX * speed; mz -= flatZ * speed; }
+    if (s.isKeyDown("A")) { mx -= rightX * speed; mz -= rightZ * speed; }
+    if (s.isKeyDown("D")) { mx += rightX * speed; mz += rightZ * speed; }
 
     let len = Math.sqrt(mx * mx + mz * mz);
     if (len > speed && len > 0) { mx = mx / len * speed; mz = mz / len * speed; }
@@ -101,7 +101,7 @@ class FirstPersonController {
     if (this.z < b.minZ) this.z = b.minZ;
     if (this.z > b.maxZ) this.z = b.maxZ;
 
-    if (s.isKeyDown("space") && this.onGround) {
+    if (s.isKeyDown("Space") && this.onGround) {
       this.velY = this.jumpForce;
       this.onGround = false;
     }
@@ -297,7 +297,7 @@ function Game() {
     let lookTarget = "";
 
     scene.onKeyDown(function (key) {
-      if (key === "e") {
+      if (key === "E") {
         let mx = scene.mouseX();
         let my = scene.mouseY();
         let hits = scene.raycast(mx, my);
