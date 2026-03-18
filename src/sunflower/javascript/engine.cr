@@ -67,9 +67,18 @@ module Sunflower
           (Medusa::Binding::QuickJS::EvalFlag::MODULE | Medusa::Binding::QuickJS::EvalFlag::COMPILE_ONLY).value
         )
 
+        if Medusa::Binding::QuickJS.IsException(result)
+          exception = Medusa::Binding::QuickJS.JS_GetException(context)
+          message = Medusa::Binding::QuickJS.ToCString(context, exception)
+
+          Log.error { "Module eval failed: #{String.new(message)}" }
+
+          Medusa::Binding::QuickJS.FreeValue(context, exception)
+          return
+        end
+
         game_module = result.u.ptr.as(Medusa::Binding::QuickJS::JSModuleDef)
         Medusa::Binding::QuickJS.JS_EvalFunction(context, result)
-
         @last_module_namespace = Medusa::Binding::QuickJS.JS_GetModuleNamespace(context, game_module)
       end
 
