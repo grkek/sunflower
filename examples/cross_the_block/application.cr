@@ -5,5 +5,7 @@ Log.setup do |c|
   c.bind("*", :debug, backend)
 end
 
+Tachyon::Configuration.instance.shadow.resolution = 16384
+
 builder = Sunflower::Builder.new
 builder.build_from_file(File.join(__DIR__, "src", "index.html"))

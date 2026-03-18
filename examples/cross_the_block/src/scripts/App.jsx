@@ -1,6 +1,6 @@
 import Stigma, { Window } from "stigma";
 import {
-  Scene, Cube, Sphere, Vector3, Input, Camera, GUI
+  Scene, Cube, Sphere, Vector3, Input, Camera, GUI, Configuration
 } from "tachyon";
 
 class FirstPersonController {
@@ -469,6 +469,8 @@ export function onStart() {
   });
 
   buildScene(player);
+
+  Configuration.setShadowResolution(16384);
 
   Window.fullscreen();
   Input.lockCursor();

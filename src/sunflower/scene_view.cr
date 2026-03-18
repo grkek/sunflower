@@ -67,11 +67,12 @@ module Sunflower
         state.viewport.camera,
         state.viewport.light_manager
       )
-      engine.canvas = state.viewport.canvas_2d
-      engine.audio = state.viewport.audio
-      state.engine = engine
 
-      engine.cursor = state.viewport.cursor
+      engine.canvas = state.viewport.canvas_2d
+      engine.audio_engine = state.viewport.audio_engine
+      engine.viewport = state.viewport
+
+      state.engine = engine
 
       context = JavaScript::Engine.instance.sandbox.engine.context
       engine.bind(context)
