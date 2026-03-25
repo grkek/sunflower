@@ -147,7 +147,6 @@ function buildScene(player) {
   Scene.add(ground);
   meshes.push(ground);
 
-  // Grass patches (subtle color variation)
   for (let i = 0; i < 20; i++) {
     let gx = (Math.random() - 0.5) * 80;
     let gz = (Math.random() - 0.5) * 80;
@@ -157,89 +156,56 @@ function buildScene(player) {
     addDecoration(gx, 0.05, gz, gs, 0.02, gd, 0.2, green, 0.12, { roughness: 1.0 });
   }
 
-  // Cobblestone plaza
   addBlockHex(player, 0, 0, 0, 14, 0.12, 14, "#5C5549");
-
-  // Central well
   addBlockHex(player, 0, 0.12, 0, 2.4, 0.8, 2.4, "#6B6560", 0, { roughness: 0.9 });
-  // Well water (dark reflective surface)
   addDecoration(0, 0.85, 0, 1.8, 0.05, 1.8, 0.1, 0.15, 0.25, { roughness: 0.1, metallic: 0.3 });
-  // Well posts
   addBlockHex(player, -0.9, 0.92, -0.9, 0.15, 1.8, 0.15, "#5B3A1E");
   addBlockHex(player, 0.9, 0.92, -0.9, 0.15, 1.8, 0.15, "#5B3A1E");
   addBlockHex(player, 0, 2.72, -0.9, 2.2, 0.15, 0.15, "#5B3A1E");
-  // Well roof
   addBlockHex(player, 0, 2.87, -0.9, 2.6, 0.08, 1.2, "#8B4513");
 
   let tx = -8, tz = -4;
-  // Foundation
   addBlockHex(player, tx, 0, tz, 8, 0.2, 6, "#4A4540");
-  // Walls
   addBlockHex(player, tx, 0.2, tz - 2.8, 8, 3.5, 0.4, "#8B7355");
   addBlockHex(player, tx, 0.2, tz + 2.8, 8, 3.5, 0.4, "#8B7355");
   addBlockHex(player, tx - 3.8, 0.2, tz, 0.4, 3.5, 6, "#8B7355");
   addBlockHex(player, tx + 3.8, 0.2, tz, 0.4, 3.5, 6, "#8B7355");
-  // Door frame opening
   addBlockHex(player, tx + 3.8, 2.5, tz, 0.5, 1.2, 1.5, "#8B7355", 2.5);
-  // Roof
   addBlockHex(player, tx, 3.7, tz, 9, 0.2, 7, "#6B3320");
   addBlockHex(player, tx, 3.9, tz, 7, 0.15, 5, "#6B3320");
-  // Chimney
   addBlockHex(player, tx - 2.5, 3.9, tz - 1.5, 1.0, 2.0, 1.0, "#5A5550");
-  // Tavern sign (glowing)
-  addDecoHex(tx + 4.2, 2.8, tz, 0.1, 0.6, 1.2, "#C8A850", {
-    emissive: [0.8, 0.6, 0.1], emissiveStrength: 2.0
-  });
-  // Interior - tables
+  addDecoHex(tx + 4.2, 2.8, tz, 0.1, 0.6, 1.2, "#C8A850", { emissive: [0.8, 0.6, 0.1], emissiveStrength: 2.0 });
   addBlockHex(player, tx - 1, 0.2, tz - 0.5, 1.2, 0.7, 0.8, "#5B3A1E");
   addBlockHex(player, tx + 1.5, 0.2, tz + 0.5, 1.0, 0.7, 1.0, "#5B3A1E");
-  // Interior - bar counter
   addBlockHex(player, tx - 2.5, 0.2, tz, 1.0, 1.0, 4.0, "#4A2A0E");
-  // Tavern fire
   emitters.tavernFire = createFireEmitter(tx - 2.5, 4.2, tz - 1.5);
   emitters.tavernEmbers = createEmberEmitter(tx - 2.5, 4.8, tz - 1.5);
-
-  // Tavern warm light
   new PointLight({ x: tx, y: 3.0, z: tz, r: 1.0, g: 0.7, b: 0.3, intensity: 1.5, range: 12 });
 
   let bx = 8, bz = -5;
-  // Forge building
   addBlockHex(player, bx, 0, bz, 6, 0.15, 5, "#4A4540");
   addBlockHex(player, bx, 0.15, bz - 2.3, 6, 3.0, 0.4, "#7A6B55");
   addBlockHex(player, bx - 2.8, 0.15, bz, 0.4, 3.0, 5, "#7A6B55");
   addBlockHex(player, bx + 2.8, 0.15, bz, 0.4, 3.0, 5, "#7A6B55");
-  // Open front
   addBlockHex(player, bx, 3.15, bz, 6.5, 0.2, 5.5, "#5A3A20");
-  // Anvil
   addBlockHex(player, bx + 0.5, 0.15, bz - 0.5, 0.6, 0.6, 0.4, "#3A3A3E", 0, { roughness: 0.3, metallic: 0.9 });
   addBlockHex(player, bx + 0.5, 0.75, bz - 0.5, 0.8, 0.15, 0.3, "#3A3A3E", 0, { roughness: 0.3, metallic: 0.9 });
-  // Forge pit
   addBlockHex(player, bx - 1, 0.15, bz - 1, 1.5, 0.6, 1.5, "#2A2A2A");
-  addDecoHex(bx - 1, 0.75, bz - 1, 1.2, 0.1, 1.2, "#FF4400", {
-    emissive: [1.0, 0.3, 0.0], emissiveStrength: 5.0
-  });
-  // Forge fire particles
+  addDecoHex(bx - 1, 0.75, bz - 1, 1.2, 0.1, 1.2, "#FF4400", { emissive: [1.0, 0.3, 0.0], emissiveStrength: 5.0 });
   emitters.forgeFire = createFireEmitter(bx - 1, 0.9, bz - 1);
   emitters.forgeEmbers = createEmberEmitter(bx - 1, 1.5, bz - 1);
-  // Forge light
   new PointLight({ x: bx - 1, y: 1.5, z: bz - 1, r: 1.0, g: 0.4, b: 0.05, intensity: 2.0, range: 10 });
-
-  // Weapon rack
   addBlockHex(player, bx - 2, 0.15, bz + 1.5, 0.15, 1.5, 0.8, "#5B3A1E");
 
   for (let i = 0; i < 4; i++) {
     let mx = -2 + i * 3.5, mz = 5;
-    // Posts
     addBlockHex(player, mx - 0.9, 0, mz - 0.6, 0.12, 2.2, 0.12, "#5B3A1E");
     addBlockHex(player, mx + 0.9, 0, mz - 0.6, 0.12, 2.2, 0.12, "#5B3A1E");
     addBlockHex(player, mx - 0.9, 0, mz + 0.6, 0.12, 2.2, 0.12, "#5B3A1E");
     addBlockHex(player, mx + 0.9, 0, mz + 0.6, 0.12, 2.2, 0.12, "#5B3A1E");
-    // Canopy
     let canopyColors = ["#AA3333", "#33AA55", "#3355AA", "#AA8833"];
     addBlockHex(player, mx, 2.2, mz, 2.2, 0.08, 1.6, canopyColors[i]);
-    // Counter
     addBlockHex(player, mx, 0, mz, 1.8, 0.85, 1.2, "#6B5A3E");
-    // Wares (small colorful blocks)
     let wareColors = ["#CC4444", "#44CC44", "#4444CC", "#CCCC44"];
     for (let w = 0; w < 3; w++) {
       addDecoHex(mx - 0.5 + w * 0.5, 0.85, mz, 0.3, 0.2, 0.3, wareColors[(i + w) % 4]);
@@ -247,100 +213,57 @@ function buildScene(player) {
   }
 
   let mtx = -5, mtz = -18;
-
-  // Base
   addBlockHex(player, mtx, 0, mtz, 4, 0.3, 4, "#4A4A5A");
-
-  // Tower body
   addBlockHex(player, mtx, 0.3, mtz, 3, 8, 3, "#5A5A6A");
-
-  // Windows (emissive)
-  addDecoHex(mtx + 1.55, 4, mtz, 0.1, 0.8, 0.4, "#6688FF", {
-    emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0
-  });
-
-  addDecoHex(mtx - 1.55, 6, mtz, 0.1, 0.8, 0.4, "#6688FF", {
-    emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0
-  });
-
-  addDecoHex(mtx, 5, mtz + 1.55, 0.4, 0.8, 0.1, "#6688FF", {
-    emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0
-  });
-
-  // Tower top
+  addDecoHex(mtx + 1.55, 4, mtz, 0.1, 0.8, 0.4, "#6688FF", { emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0 });
+  addDecoHex(mtx - 1.55, 6, mtz, 0.1, 0.8, 0.4, "#6688FF", { emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0 });
+  addDecoHex(mtx, 5, mtz + 1.55, 0.4, 0.8, 0.1, "#6688FF", { emissive: [0.3, 0.5, 1.0], emissiveStrength: 3.0 });
   addBlockHex(player, mtx, 8.3, mtz, 3.6, 0.3, 3.6, "#5A5A6A");
-
-  // Battlement
   addBlockHex(player, mtx - 1.3, 8.6, mtz, 0.4, 0.6, 0.4, "#5A5A6A");
   addBlockHex(player, mtx + 1.3, 8.6, mtz, 0.4, 0.6, 0.4, "#5A5A6A");
   addBlockHex(player, mtx, 8.6, mtz - 1.3, 0.4, 0.6, 0.4, "#5A5A6A");
   addBlockHex(player, mtx, 8.6, mtz + 1.3, 0.4, 0.6, 0.4, "#5A5A6A");
-
-  // Mystic particles at top
   emitters.mystic = createMysticEmitter(mtx, 9.2, mtz);
-
-  // Tower light
   new PointLight({ x: mtx, y: 9.5, z: mtz, r: 0.3, g: 0.5, b: 1.0, intensity: 2.5, range: 20 });
 
-  // Stream bed (dark)
   addDecoration(15, -0.3, 3, 2.5, 0.4, 30, 0.12, 0.18, 0.25, { roughness: 0.1, metallic: 0.2 });
-
-  // Bridge
   addBlockHex(player, 15, 0, 3, 4, 0.4, 3, "#6B6560");
   addBlockHex(player, 13.5, 0.4, 1.8, 0.3, 0.6, 0.3, "#6B6560");
   addBlockHex(player, 16.5, 0.4, 1.8, 0.3, 0.6, 0.3, "#6B6560");
   addBlockHex(player, 13.5, 0.4, 4.2, 0.3, 0.6, 0.3, "#6B6560");
   addBlockHex(player, 16.5, 0.4, 4.2, 0.3, 0.6, 0.3, "#6B6560");
-
-  // Mist near stream
   emitters.streamMist = createWaterfallMist(15, 0.1, 3);
 
   let gx = 20, gz = -15;
   addBlockHex(player, gx, 0, gz, 10, 0.08, 8, "#2A2A22");
-
-  // Fence
   for (let f = -4.5; f <= 4.5; f += 1.0) {
     addDecoHex(gx + f, 0.08, gz - 3.8, 0.08, 0.8, 0.08, "#3A3530");
     addDecoHex(gx + f, 0.08, gz + 3.8, 0.08, 0.8, 0.08, "#3A3530");
   }
-
   for (let f = -3.5; f <= 3.5; f += 1.0) {
     addDecoHex(gx - 4.8, 0.08, gz + f, 0.08, 0.8, 0.08, "#3A3530");
     addDecoHex(gx + 4.8, 0.08, gz + f, 0.08, 0.8, 0.08, "#3A3530");
   }
-
-  // Headstones
   let headstones = [
     [gx - 2.5, gz - 1.5], [gx - 0.5, gz - 2], [gx + 1.5, gz - 1],
     [gx - 1.5, gz + 1], [gx + 0.5, gz + 1.5], [gx + 3, gz + 0.5],
     [gx + 2.5, gz - 2], [gx - 3, gz + 0],
   ];
-
   for (let i = 0; i < headstones.length; i++) {
     let hx = headstones[i][0], hz = headstones[i][1];
     let ht = 0.5 + Math.random() * 0.5;
     addDecoHex(hx, 0.08, hz, 0.5, ht, 0.12, "#5A5A5A", { roughness: 0.95 });
   }
-
-  // Eerie dust
   emitters.graveyardDust = createDustEmitter(gx, 0.5, gz);
 
   let cfx = 5, cfz = 12;
-
-  // Fire pit ring
   addBlockHex(player, cfx, 0, cfz, 1.6, 0.3, 1.6, "#4A4540");
   addDecoration(cfx, 0.3, cfz, 1.0, 0.15, 1.0, 0.15, 0.08, 0.05);
-
-  // Logs around fire
   addBlockHex(player, cfx - 2, 0, cfz, 1.5, 0.35, 0.35, "#5B3A1E");
   addBlockHex(player, cfx + 2, 0, cfz + 0.5, 1.5, 0.35, 0.35, "#5B3A1E");
   addBlockHex(player, cfx, 0, cfz - 2, 0.35, 0.35, 1.5, "#5B3A1E");
-
-  // Campfire
   emitters.campfire = createFireEmitter(cfx, 0.45, cfz);
   emitters.campEmbers = createEmberEmitter(cfx, 1.0, cfz);
-
-  // Campfire light
   new PointLight({ x: cfx, y: 1.5, z: cfz, r: 1.0, g: 0.6, b: 0.2, intensity: 2.0, range: 15 });
 
   let treePositions = [
@@ -352,11 +275,7 @@ function buildScene(player) {
     let treex = treePositions[i][0], treez = treePositions[i][1];
     let trunkH = 2.5 + Math.random() * 2;
     let leafSize = 1.8 + Math.random() * 1.5;
-
-    // Trunk
     addBlockHex(player, treex, 0, treez, 0.4, trunkH, 0.4, "#5B3A1E");
-
-    // Canopy layers
     let leafGreen = 0.25 + Math.random() * 0.2;
     addDecoration(treex, trunkH, treez, leafSize, leafSize * 0.6, leafSize, 0.15, leafGreen, 0.1);
     addDecoration(treex, trunkH + leafSize * 0.4, treez, leafSize * 0.7, leafSize * 0.5, leafSize * 0.7, 0.12, leafGreen + 0.05, 0.08);
@@ -366,52 +285,32 @@ function buildScene(player) {
   addBlockHex(player, ax - 2, 0, az, 1.2, 4, 1.2, "#6A6A6A");
   addBlockHex(player, ax + 2, 0, az, 1.2, 4, 1.2, "#6A6A6A");
   addBlockHex(player, ax, 3.5, az, 5.5, 0.8, 1.2, "#6A6A6A", 3.5);
-
-  // Broken pieces
   addDecoHex(ax + 3, 0, az + 1, 0.8, 0.5, 0.6, "#5A5A5A");
   addDecoHex(ax - 1, 0, az + 1.5, 0.6, 0.3, 0.5, "#5A5A5A");
-
-  // Mystic glow in archway
   emitters.archMystic = createMysticEmitter(ax, 2.0, az);
   new PointLight({ x: ax, y: 2.5, z: az, r: 0.4, g: 0.3, b: 1.0, intensity: 1.5, range: 8 });
 
   let dx = 30, dz = 0;
-
-  // Water area
   addDecoration(dx + 5, -0.2, dz, 15, 0.3, 8, 0.1, 0.2, 0.35, { roughness: 0.05, metallic: 0.3 });
-
-  // Pier planks
   addBlockHex(player, dx, 0, dz, 8, 0.2, 2.5, "#6B4A2E");
-
-  // Pier posts
   addBlockHex(player, dx - 3, -0.5, dz - 1, 0.3, 0.8, 0.3, "#5B3A1E");
   addBlockHex(player, dx - 3, -0.5, dz + 1, 0.3, 0.8, 0.3, "#5B3A1E");
   addBlockHex(player, dx + 3, -0.5, dz - 1, 0.3, 0.8, 0.3, "#5B3A1E");
   addBlockHex(player, dx + 3, -0.5, dz + 1, 0.3, 0.8, 0.3, "#5B3A1E");
-
-  // Barrel on pier
   addBlockHex(player, dx + 2, 0.2, dz + 0.5, 0.6, 0.8, 0.6, "#6B4A2E");
   addBlockHex(player, dx + 2.8, 0.2, dz - 0.5, 0.5, 0.7, 0.5, "#5B3A1E");
-
-  // Mist
   emitters.dockMist = createWaterfallMist(dx + 5, 0.1, dz);
 
   let wtx = 6, wtz = -10;
   addBlockHex(player, wtx, 0, wtz, 2, 6, 2, "#6B5A40");
   addBlockHex(player, wtx, 6, wtz, 2.8, 0.2, 2.8, "#7B6A50");
-
-  // Railing
   addBlockHex(player, wtx - 1.2, 6.2, wtz, 0.1, 0.8, 2.8, "#5B3A1E");
   addBlockHex(player, wtx + 1.2, 6.2, wtz, 0.1, 0.8, 2.8, "#5B3A1E");
   addBlockHex(player, wtx, 6.2, wtz - 1.2, 2.8, 0.8, 0.1, "#5B3A1E");
   addBlockHex(player, wtx, 6.2, wtz + 1.2, 2.8, 0.8, 0.1, "#5B3A1E");
-
-  // Stairs
   for (let s = 0; s < 12; s++) {
     addBlockHex(player, wtx + 1.5, s * 0.5, wtz - 0.8 + s * 0.15, 0.8, 0.5, 0.5, "#5B4A30");
   }
-
-  // Torch at top
   emitters.watchFire = createFireEmitter(wtx, 7.2, wtz);
   new PointLight({ x: wtx, y: 7.5, z: wtz, r: 1.0, g: 0.7, b: 0.3, intensity: 2.0, range: 18 });
 
@@ -424,7 +323,6 @@ function buildScene(player) {
     [-3, -1], [-5, -2], [-7, -4], [-9, -6], [-11, -8],
     [2, 3], [3, 6], [4, 9], [5, 12],
   ];
-
   for (let i = 0; i < pathPoints.length; i++) {
     let px = pathPoints[i][0], pz = pathPoints[i][1];
     let sw = 0.8 + Math.random() * 0.6;
@@ -435,46 +333,260 @@ function buildScene(player) {
   Configuration.setAmbientColor(0.12, 0.1, 0.14);
 }
 
-let animatedLights = [];
-let gameTime = 0;
+// Game State
 
-function updateAnimations(dt) {
-  gameTime += dt;
+const SW = 1920;
+const SH = 1080;
 
-  // Flicker campfire and forge lights by modulating particle rates
-  // (Lights don't have setIntensity per-frame yet, but particles give the visual flicker)
-}
+let playerHealth = 100;
+let playerMaxHealth = 100;
+let playerStamina = 100;
+let playerMaxStamina = 100;
+let staminaDrainRate = 25;
+let staminaRegenRate = 15;
+let staminaRegenDelay = 1.5;
+let staminaRegenTimer = 0;
+let staminaExhausted = false;
+
+let fallDamageThreshold = 4.0;
+let fallDamageMultiplier = 8.0;
+let damageFlashTimer = 0;
+
+const LOCATIONS = [
+  { name: "Tavern",          x: -8,  z: -4,  radius: 6 },
+  { name: "Blacksmith",      x: 8,   z: -5,  radius: 5 },
+  { name: "Market Square",   x: 3,   z: 5,   radius: 8 },
+  { name: "Mage Tower",      x: -5,  z: -18, radius: 5 },
+  { name: "Town Square",     x: 0,   z: 0,   radius: 8 },
+  { name: "Graveyard",       x: 20,  z: -15, radius: 7 },
+  { name: "Campfire",        x: 5,   z: 12,  radius: 4 },
+  { name: "Watchtower",      x: 6,   z: -10, radius: 4 },
+  { name: "Ancient Archway", x: -25, z: -18, radius: 5 },
+  { name: "Docks",           x: 30,  z: 0,   radius: 7 },
+  { name: "Bridge",          x: 15,  z: 3,   radius: 4 },
+];
+
+let currentLocation = "";
+let lastLocation = "";
+let locationShowTimer = 0;
+let locationFade = 0;
 
 let frames = 0;
 let fpsTimer = 0;
 let fps = 0;
+let gameTime = 0;
 
-function drawHUD(player) {
-  let pos = player.getPosition();
-  let status = player.getStatus();
+// Game Logic
 
-  GUI.text(pos.x.toFixed(1) + ", " + pos.y.toFixed(1) + ", " + pos.z.toFixed(1), 10, 10, 2.0, 0.9, 0.9, 0.9, 0.7);
-  GUI.text("FPS: " + fps, 10, 35, 2.5, 1, 1, 1, 0.9);
+function detectLocation(px, pz) {
+  for (let i = 0; i < LOCATIONS.length; i++) {
+    let loc = LOCATIONS[i];
+    let dx = px - loc.x, dz = pz - loc.z;
+    if (dx * dx + dz * dz < loc.radius * loc.radius) return loc.name;
+  }
+  return "Wilderness";
+}
 
-  // Crosshair
-  GUI.rect(640 - 1, 360 - 8, 2, 16, 1, 1, 1, 0.5);
-  GUI.rect(640 - 8, 360 - 1, 16, 2, 1, 1, 1, 0.5);
+function updateStamina(dt, player) {
+  let isSprinting = player.sprinting && player._groundSpeed > 0.5;
 
-  // Status
-  if (status === "sprinting") {
-    GUI.text("SPRINTING", 10, 680, 1.5, 1.0, 0.8, 0.3, 0.8);
-  } else if (status === "crouching") {
-    GUI.text("CROUCHING", 10, 680, 1.5, 0.5, 0.8, 1.0, 0.8);
+  if (isSprinting && !staminaExhausted) {
+    playerStamina = Math.max(0, playerStamina - staminaDrainRate * dt);
+    staminaRegenTimer = staminaRegenDelay;
+    if (playerStamina <= 0) {
+      staminaExhausted = true;
+      player.sprintBlocked = true;
+    }
+  } else {
+    if (staminaRegenTimer > 0) {
+      staminaRegenTimer -= dt;
+    } else {
+      playerStamina = Math.min(playerMaxStamina, playerStamina + staminaRegenRate * dt);
+    }
+    if (staminaExhausted && playerStamina >= playerMaxStamina * 0.3) {
+      staminaExhausted = false;
+      player.sprintBlocked = false;
+    }
   }
 }
+
+function updateFallDamage(player) {
+  if (player.justLanded && player.landFallHeight > fallDamageThreshold) {
+    let damage = (player.landFallHeight - fallDamageThreshold) * fallDamageMultiplier;
+    playerHealth = Math.max(0, playerHealth - damage);
+    damageFlashTimer = 0.35;
+  }
+}
+
+// HUD Drawing
+
+function drawBar(x, y, w, h, value, maxValue, r, g, b) {
+  let pct = Math.max(0, Math.min(1, value / maxValue));
+  GUI.rect(x, y, w, h, 0.05, 0.04, 0.03, 0.55);
+  if (pct > 0) GUI.rect(x + 1, y + 1, (w - 2) * pct, h - 2, r, g, b, 0.85);
+  GUI.rect(x, y, w, 1, 0.55, 0.45, 0.3, 0.35);
+  GUI.rect(x, y + h - 1, w, 1, 0.55, 0.45, 0.3, 0.35);
+  GUI.rect(x, y, 1, h, 0.55, 0.45, 0.3, 0.35);
+  GUI.rect(x + w - 1, y, 1, h, 0.55, 0.45, 0.3, 0.35);
+}
+
+function drawCrosshair() {
+  let cx = SW / 2;
+  let cy = SH / 2;
+  GUI.rect(cx - 1, cy - 1, 3, 3, 1, 1, 1, 0.55);
+  let len = 12, gap = 5, t = 1.5;
+  GUI.rect(cx - gap - len, cy - t / 2, len, t, 1, 1, 1, 0.3);
+  GUI.rect(cx + gap, cy - t / 2, len, t, 1, 1, 1, 0.3);
+  GUI.rect(cx - t / 2, cy - gap - len, t, len, 1, 1, 1, 0.3);
+  GUI.rect(cx - t / 2, cy + gap, t, len, 1, 1, 1, 0.3);
+}
+
+function drawCompass(yaw) {
+  let cx = SW / 2;
+  let y = 20;
+  let halfW = 180;
+
+  GUI.rect(cx - halfW - 2, y - 2, halfW * 2 + 4, 28, 0, 0, 0, 0.35);
+  GUI.rect(cx - 1, y - 5, 2, 5, 1.0, 0.85, 0.5, 0.85);
+
+  let bearing = (-(yaw + Math.PI / 2)) * 180 / Math.PI;
+  bearing = ((bearing % 360) + 360) % 360;
+
+  for (let a = 0; a < 360; a += 5) {
+    let diff = ((a - bearing + 540) % 360) - 180;
+    let screenX = cx + (diff / 90) * halfW;
+    if (screenX < cx - halfW || screenX > cx + halfW) continue;
+
+    if (a % 90 === 0) {
+      let labels = { 0: "N", 90: "E", 180: "S", 270: "W" };
+      let isN = a === 0;
+      GUI.text(labels[a], screenX - (isN ? 4 : 4), y + 2, 1.8, isN ? 1.0 : 0.85, isN ? 0.35 : 0.8, isN ? 0.3 : 0.7, 0.9);
+    } else if (a % 45 === 0) {
+      let labels = { 45: "NE", 135: "SE", 225: "SW", 315: "NW" };
+      GUI.text(labels[a], screenX - 7, y + 4, 1.2, 0.55, 0.5, 0.45, 0.55);
+    } else if (a % 15 === 0) {
+      GUI.rect(screenX, y + 16, 1, 6, 0.45, 0.4, 0.3, 0.3);
+    }
+  }
+}
+
+function drawPlayerBars() {
+  let barW = 240;
+  let barH = 12;
+  let x = 30;
+  let baseY = SH - 70;
+
+  let hpPct = playerHealth / playerMaxHealth;
+  drawBar(x, baseY, barW, barH, playerHealth, playerMaxHealth,
+    hpPct > 0.25 ? 0.7 : 0.9, hpPct > 0.25 ? 0.15 : 0.08, 0.12);
+  GUI.text("HP", x, baseY - 18, 1.5, 0.85, 0.35, 0.3, 0.7);
+  GUI.text(Math.ceil(playerHealth).toString(), x + barW + 8, baseY - 1, 1.4, 0.85, 0.35, 0.3, 0.55);
+
+  if (hpPct <= 0.25 && hpPct > 0) {
+    let pulse = 0.5 + Math.sin(gameTime * 4) * 0.2;
+    GUI.rect(x + 1, baseY + 1, (barW - 2) * hpPct, barH - 2, 0.9, 0.1, 0.08, pulse);
+  }
+
+  let spY = baseY + barH + 8;
+  drawBar(x, spY, barW, barH, playerStamina, playerMaxStamina,
+    staminaExhausted ? 0.45 : 0.2, staminaExhausted ? 0.3 : 0.6, staminaExhausted ? 0.15 : 0.22);
+  GUI.text("SP", x, spY - 18, 1.5, 0.35, 0.8, 0.45, 0.7);
+  GUI.text(Math.ceil(playerStamina).toString(), x + barW + 8, spY - 1, 1.4, 0.35, 0.8, 0.45, 0.55);
+
+  if (staminaExhausted) {
+    let blink = 0.5 + Math.sin(gameTime * 6) * 0.35;
+    GUI.text("EXHAUSTED", x + 60, spY + barH + 6, 1.3, 0.9, 0.5, 0.15, blink);
+  }
+}
+
+function drawLocationName(dt) {
+  if (currentLocation !== lastLocation) {
+    lastLocation = currentLocation;
+    locationShowTimer = 3.5;
+    locationFade = 1.0;
+  }
+  if (locationShowTimer > 0) {
+    locationShowTimer -= dt;
+    if (locationShowTimer < 0.6) locationFade = Math.max(0, locationShowTimer / 0.6);
+    // Try different character widths — adjust this number until centered
+    let charW = 20;
+    let tw = currentLocation.length * charW;
+    GUI.text(currentLocation, (SW - tw) / 2, 62, 2.8, 0.95, 0.85, 0.6, locationFade * 0.85);
+  }
+}
+
+function drawStatusIndicator(player) {
+  let status = player.getStatus();
+  if (status === "sprinting") {
+    GUI.text("SPRINT", SW / 2 - 30, SH - 100, 1.5, 1.0, 0.85, 0.35, 0.6);
+  } else if (status === "crouching") {
+    GUI.text("CROUCH", SW / 2 - 32, SH - 100, 1.5, 0.5, 0.8, 1.0, 0.6);
+  }
+}
+
+function drawDamageFlash(dt) {
+  if (damageFlashTimer > 0) {
+    damageFlashTimer -= dt;
+    let a = (damageFlashTimer / 0.35) * 0.35;
+    let t = 6;
+    GUI.rect(0, 0, SW, t, 0.8, 0.08, 0.05, a);
+    GUI.rect(0, SH - t, SW, t, 0.8, 0.08, 0.05, a);
+    GUI.rect(0, 0, t, SH, 0.8, 0.08, 0.05, a);
+    GUI.rect(SW - t, 0, t, SH, 0.8, 0.08, 0.05, a);
+  }
+}
+
+function drawCoords(player) {
+  let pos = player.getPosition();
+  GUI.text(Math.floor(pos.x) + ", " + Math.floor(pos.z), SW - 100, SH - 28, 1.3, 0.55, 0.5, 0.4, 0.4);
+}
+
+function drawFPS() {
+  GUI.text(fps.toString(), SW - 50, 16, 1.6, 0.65, 0.65, 0.65, 0.4);
+}
+
+function drawHUD(player, dt) {
+  let pos = player.getPosition();
+  currentLocation = detectLocation(pos.x, pos.z);
+
+  updateStamina(dt, player);
+  updateFallDamage(player);
+
+  drawCrosshair();
+  drawCompass(player.yaw);
+  drawPlayerBars();
+  drawLocationName(dt);
+  drawStatusIndicator(player);
+  drawDamageFlash(dt);
+  drawCoords(player);
+  drawFPS();
+}
+
+// Pause Menu
+
+function drawPauseMenu() {
+  GUI.rect(0, 0, SW, SH, 0, 0, 0, 0.65);
+  GUI.text("PAUSED", SW / 2 - 62, SH / 2 - 100, 4.5, 0.95, 0.85, 0.6, 1.0);
+  GUI.rect(SW / 2 - 100, SH / 2 - 48, 200, 1, 0.65, 0.55, 0.35, 0.3);
+
+  let sy = SH / 2 - 15;
+  let lh = 32;
+  let keys = ["W A S D", "SHIFT", "CTRL / C", "SPACE", "ESC"];
+  let acts = ["Move", "Sprint", "Crouch", "Jump", "Resume"];
+  for (let i = 0; i < keys.length; i++) {
+    GUI.text(keys[i], SW / 2 - 90, sy + i * lh, 1.7, 0.95, 0.85, 0.6, 0.8);
+    GUI.text(acts[i], SW / 2 + 30, sy + i * lh, 1.7, 0.6, 0.55, 0.45, 0.6);
+  }
+  GUI.text("Press ESC to resume", SW / 2 - 78, sy + keys.length * lh + 20, 1.4, 0.4, 0.38, 0.33, 0.45);
+}
+
+// Main
 
 let player;
 let menuOpen = false;
 
 export function onStart() {
   try {
-
-
     player = new FirstPersonController({
       x: 0, z: 8, eyeHeight: 1.7, yaw: -Math.PI / 2,
       moveSpeed: 5.0, sprintMultiplier: 1.8,
@@ -491,13 +603,13 @@ export function onStart() {
     Configuration.setSkyboxTopColor(0.08, 0.12, 0.28);
     Configuration.setSkyboxBottomColor(0.95, 0.55, 0.25);
 
-    try {
-      Pipeline.removeStage("chromatic_aberration");
-      Pipeline.removeStage("color_grading");
-      Pipeline.removeStage("vignette");
-    } catch (e) {
-      Debug.log("Pipeline cleanup: " + e.message);
-    }
+    // try {
+    //   Pipeline.removeStage("chromatic_aberration");
+    //   Pipeline.removeStage("color_grading");
+    //   Pipeline.removeStage("vignette");
+    // } catch (e) {
+    //   Debug.log("Pipeline cleanup: " + e.message);
+    // }
 
     Window.fullscreen();
     Input.lockCursor();
@@ -511,27 +623,18 @@ export function onUpdate(dt) {
 
   if (Input.keyPressed("Escape")) {
     menuOpen = !menuOpen;
-    if (menuOpen) {
-      Input.unlockCursor();
-    } else {
-      Input.lockCursor();
-    }
+    if (menuOpen) Input.unlockCursor();
+    else Input.lockCursor();
   }
 
   if (menuOpen) {
-    GUI.rect(0, 0, 9999, 9999, 0, 0, 0, 0.6);
-    GUI.text("PAUSED", 560, 300, 4.0, 1, 1, 1, 1);
-    GUI.text("Press ESC to resume", 530, 360, 2.0, 0.7, 0.7, 0.7, 1);
-    GUI.text("WASD - Move", 530, 420, 1.5, 0.6, 0.6, 0.6, 0.8);
-    GUI.text("SHIFT - Sprint", 530, 445, 1.5, 0.6, 0.6, 0.6, 0.8);
-    GUI.text("CTRL/C - Crouch", 530, 470, 1.5, 0.6, 0.6, 0.6, 0.8);
-    GUI.text("SPACE - Jump", 530, 495, 1.5, 0.6, 0.6, 0.6, 0.8);
+    drawPauseMenu();
     return;
   }
 
   player.update(dt);
-  updateAnimations(dt);
-  drawHUD(player);
+  gameTime += dt;
+  drawHUD(player, dt);
 
   frames++;
   fpsTimer += dt;

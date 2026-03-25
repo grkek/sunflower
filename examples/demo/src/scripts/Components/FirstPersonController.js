@@ -38,6 +38,8 @@ class FirstPersonController {
     this.standHeight = this.eyeHeight;
     this.currentEyeHeight = this.eyeHeight;
 
+    this.sprintBlocked = false; // External sprint block (stamina system)
+
     this.targetYaw = this.yaw;
     this.targetPitch = this.pitch;
 
@@ -54,6 +56,8 @@ class FirstPersonController {
     this.landingDipVel = 0;
     this.wasOnGround = true;
     this.fallStartY = this.y;
+    this.justLanded = false;
+    this.landFallHeight = 0;
 
     this.lastMouseX = -1;
     this.lastMouseY = -1;
@@ -135,8 +139,15 @@ class FirstPersonController {
     this.velX *= 0.1; this.velZ *= 0.1;
   }
 
+  isOnGround() { return this.onGround; }
+  getYaw() { return this.yaw; }
+  getPitch() { return this.pitch; }
+
   update(dt) {
     if (dt <= 0 || dt > 0.1) dt = 0.016;
+
+    this.justLanded = false;
+    this.landFallHeight = 0;
 
     this.updateMouse();
 
@@ -159,8 +170,9 @@ class FirstPersonController {
     this.viewPunchPitch -= this.viewPunchPitch * this.viewPunchDecay * dt;
     this.viewPunchYaw -= this.viewPunchYaw * this.viewPunchDecay * dt;
 
-    // Sprint / crouch
-    this.sprinting = Input.keyDown("Shift_L") || Input.keyDown("Shift_R");
+    // Sprint / crouch — respect external sprint block
+    let wantSprint = Input.keyDown("Shift_L") || Input.keyDown("Shift_R");
+    this.sprinting = wantSprint && !this.sprintBlocked;
     this.crouching = Input.keyDown("Control_L") || Input.keyDown("Control_R") || Input.keyDown("C");
     let targetEye = this.crouching ? this.crouchHeight : this.standHeight;
     this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 12);
@@ -239,16 +251,20 @@ class FirstPersonController {
     let floorHeight = this._getFloorAt(this.x, this.z);
     let feetTarget = floorHeight + this.currentEyeHeight;
 
-    this.wasOnGround = this.onGround;
+    let prevOnGround = this.onGround;
     if (this.y <= feetTarget) {
-      if (!this.onGround && this.velY < -2) {
+      if (!prevOnGround && this.velY < -2) {
         this.landingDipVel = -Math.min((this.fallStartY - this.y) * 0.02, 0.4);
+        this.landFallHeight = this.fallStartY - this.y;
+        this.justLanded = true;
       }
       this.y = feetTarget; this.velY = 0; this.onGround = true;
     } else {
       this.onGround = false;
-      if (this.wasOnGround && this.velY <= 0) this.fallStartY = this.y;
+      if (prevOnGround && this.velY <= 0) this.fallStartY = this.y;
     }
+
+    this.wasOnGround = prevOnGround;
 
     // Landing dip
     this.landingDip += this.landingDipVel;
@@ -305,6 +321,8 @@ class FirstPersonController {
   }
 
   getPosition() { return { x: this.x, y: this.y, z: this.z }; }
+  getYaw() { return this.yaw; }
+  isOnGround() { return this.onGround; }
 }
 
 export default FirstPersonController;
