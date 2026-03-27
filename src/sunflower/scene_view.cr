@@ -65,7 +65,8 @@ module Sunflower
       engine = Tachyon::Scripting::Engine.new(
         state.viewport.scene,
         state.viewport.camera,
-        state.viewport.light_manager
+        state.viewport.light_manager,
+        state.viewport.font_manager
       )
 
       engine.canvas = state.viewport.canvas_2d
